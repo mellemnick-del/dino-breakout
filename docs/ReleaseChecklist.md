@@ -5,7 +5,7 @@ Work top to bottom. Items marked **(done)** are already handled in the project.
 ## 1. Project (done)
 
 - [x] App icon (paddock gate design, 1024 x 1024)
-- [x] Bundle ID `com.zeroday.dinobreakout`, version **1.0.0**, build **1**
+- [x] Bundle ID `com.nickmellem.dinobreakout`, version **1.0.0**, build **1**
 - [x] Export compliance: no non-exempt encryption (`ITSAppUsesNonExemptEncryption = NO`), so App Store Connect won't ask
 - [x] Game Center capability on (`DinoBreakout.entitlements`)
 - [x] Test mode only exists in builds run from Xcode. TestFlight and App Store builds never have it (Apple rejects hidden features)
@@ -16,7 +16,7 @@ Work top to bottom. Items marked **(done)** are already handled in the project.
 1. Xcode, Settings, Accounts: make sure your developer Apple ID is listed.
 2. Click the blue DinoBreakout project icon, select the DinoBreakout target, open **Signing & Capabilities**.
 3. Team: pick your **paid developer team** (not "Personal Team").
-4. You should see **Game Center** listed as a capability. If Xcode shows a red error about the bundle ID, change it (for example `com.zeroday.dinobreakout2`) and use that everywhere below.
+4. You should see **Game Center** listed as a capability. If Xcode shows a red error about the bundle ID, change it (for example `com.nickmellem.dinobreakout2`) and use that everywhere below.
 
 ## 3. Host the support and privacy pages
 

@@ -119,11 +119,11 @@ All the numbers live in a few obvious places:
 
 ## Get it on TestFlight
 
-TestFlight lets you (and your family) install the game from Apple's TestFlight app instead of plugging a phone into Xcode. The app icon, bundle ID (`com.zeroday.dinobreakout`), and export compliance answer are already set up.
+TestFlight lets you (and your family) install the game from Apple's TestFlight app instead of plugging a phone into Xcode. The app icon, bundle ID (`com.nickmellem.dinobreakout`), and export compliance answer are already set up.
 
 1. **Join the Apple Developer Program** at developer.apple.com/programs ($99 a year). Approval can take up to 48 hours.
 2. **Sign in to Xcode** with that Apple ID: Xcode, Settings, Accounts, then the + button.
-3. **Pick your team:** click the blue DinoBreakout project icon, select the DinoBreakout target, open **Signing & Capabilities**, and choose your team. If Xcode says the bundle ID is taken, change it (for example to `com.zeroday.dinobreakout2`).
+3. **Pick your team:** click the blue DinoBreakout project icon, select the DinoBreakout target, open **Signing & Capabilities**, and choose your team. If Xcode says the bundle ID is taken, change it (for example to `com.nickmellem.dinobreakout2`).
 4. **Create the app record** at appstoreconnect.apple.com: Apps, the + button, New App. Platform iOS, name **Dino Breakout: Tower Defense** (if the name is taken, try another), your bundle ID from step 3, and any SKU such as `dinobreakout`.
 5. **Upload a build:** in Xcode, set the run destination at the top to **Any iOS Device (arm64)**, then Product, Archive. When the Organizer window opens, click **Distribute App**, choose **App Store Connect**, and follow the prompts to upload.
 6. **Wait for processing** (usually 10 to 30 minutes). The build shows up under the app's **TestFlight** tab.
