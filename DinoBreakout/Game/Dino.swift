@@ -1,7 +1,7 @@
 import SpriteKit
 
 enum DinoKind {
-    case compy, raptor, triceratops, rex
+    case compy, raptor, triceratops, rex, pterodactyl
 
     var name: String {
         switch self {
@@ -9,7 +9,13 @@ enum DinoKind {
         case .raptor: "Raptor"
         case .triceratops: "Triceratops"
         case .rex: "T-Rex"
+        case .pterodactyl: "Pterodactyl"
         }
+    }
+
+    /// Flyers go straight over the maze and can't be reached by flares.
+    var flies: Bool {
+        self == .pterodactyl
     }
 
     var plural: String {
@@ -18,6 +24,7 @@ enum DinoKind {
         case .raptor: "raptors"
         case .triceratops: "triceratops"
         case .rex: "T-Rex"
+        case .pterodactyl: "pterodactyls"
         }
     }
 
@@ -27,6 +34,7 @@ enum DinoKind {
         case .raptor: 40
         case .triceratops: 200
         case .rex: 1300
+        case .pterodactyl: 32
         }
     }
 
@@ -37,6 +45,7 @@ enum DinoKind {
         case .raptor: 2.5
         case .triceratops: 0.85
         case .rex: 0.6
+        case .pterodactyl: 1.5
         }
     }
 
@@ -47,6 +56,7 @@ enum DinoKind {
         case .raptor: 4
         case .triceratops: 12
         case .rex: 80
+        case .pterodactyl: 5
         }
     }
 
@@ -57,8 +67,18 @@ enum DinoKind {
         case .raptor: 1
         case .triceratops: 2
         case .rex: 10
+        case .pterodactyl: 1
         }
     }
+}
+
+/// A flyer's straight line from the gate to the helipad, with a weave.
+struct Flight {
+    let start: CGPoint
+    let end: CGPoint
+    /// Which way it swoops first.
+    let weave: CGFloat
+    var travelled: CGFloat = 0
 }
 
 final class Dino: SKNode {
@@ -69,6 +89,8 @@ final class Dino: SKNode {
     /// The cell it last stood on, and the one it's walking toward.
     var cell: Cell
     var target: Cell
+    /// Set for flyers, which ignore the grid.
+    var flight: Flight?
 
     private var slowFactor: CGFloat = 1
     private var slowTimeLeft: TimeInterval = 0
@@ -95,7 +117,14 @@ final class Dino: SKNode {
         shadow = SKShapeNode(ellipseOf: baked.shadowSize)
         shadow.fillColor = SKColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.34)
         shadow.strokeColor = .clear
-        shadowOffset = CGPoint(x: cellSize * 0.05, y: -cellSize * 0.08)
+        if kind.flies {
+            // High up: the shadow lands well below and under the towers
+            shadowOffset = CGPoint(x: cellSize * 0.35, y: -cellSize * 0.55)
+            shadow.fillColor = SKColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.22)
+            shadow.zPosition = -6
+        } else {
+            shadowOffset = CGPoint(x: cellSize * 0.05, y: -cellSize * 0.08)
+        }
         shadow.position = shadowOffset
         shadow.zRotation = heading
 
@@ -118,7 +147,7 @@ final class Dino: SKNode {
         bar.isHidden = true
 
         super.init()
-        zPosition = kind == .rex ? 6 : 5
+        zPosition = kind.flies ? 8.5 : (kind == .rex ? 6 : 5)
         addChild(shadow)
         addChild(art)
         addChild(sleepy)

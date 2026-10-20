@@ -1,7 +1,7 @@
 import AVFoundation
 
 enum Sound: CaseIterable {
-    case turret, tranq, flare, hit, dinoDown, roar, alarm, place, upgrade, sell, escape, win, lose, zap
+    case turret, tranq, flare, hit, dinoDown, roar, screech, alarm, place, upgrade, sell, escape, win, lose, zap
 
     /// How loud this one sits in the mix.
     var gain: Float {
@@ -12,6 +12,7 @@ enum Sound: CaseIterable {
         case .hit: 0.35
         case .dinoDown: 0.6
         case .roar: 1
+        case .screech: 0.5
         case .alarm: 0.5
         case .place, .upgrade, .sell: 0.6
         case .escape: 0.6
@@ -26,6 +27,7 @@ enum Sound: CaseIterable {
         case .turret: 0.06
         case .hit: 0.05
         case .zap: 0.2
+        case .screech: 0.8
         default: 0.02
         }
     }
@@ -175,6 +177,13 @@ final class SoundBank {
                 let pitch = 62 + 10 * sin(2 * .pi * 1.3 * t) - t * 12
                 let saw = Float(2 * ((pitch * t).truncatingRemainder(dividingBy: 1)) - 1)
                 return (lowpass(saw * 0.6 + self.noise() * 0.5, 0.12) * 2.2) * growl * attack * release
+            }
+        case .screech:
+            return buffer(0.55) { t, _ in
+                let attack = Float(min(1, t / 0.03))
+                let pitch = 2300 - t * 1700 + 120 * sin(2 * .pi * 28 * t)
+                let tone = self.sine(pitch, t) * 0.6 + self.sine(pitch * 1.5, t) * 0.25
+                return (tone + self.noise() * 0.15) * attack * self.decay(t, 5)
             }
         case .alarm:
             return buffer(0.9) { t, _ in

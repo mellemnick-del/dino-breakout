@@ -61,6 +61,10 @@ enum Waves {
         let pace = max(0.6, 1 - CGFloat(number - 10) * 0.01)
         func every(_ base: TimeInterval) -> TimeInterval { base * TimeInterval(pace) }
 
+        return lineup(forWave: number, n: n, every: every) + flyers(forWave: number, n: n, every: every)
+    }
+
+    private static func lineup(forWave number: Int, n: (Int) -> Int, every: (TimeInterval) -> TimeInterval) -> [SpawnGroup] {
         if number % 10 == 0 {
             let rexes = number / 10
             return [
@@ -93,6 +97,24 @@ enum Waves {
                 SpawnGroup(kind: .triceratops, count: n(5), every: every(1.6), startAt: 6)
             ]
         }
+    }
+
+    /// Pterodactyls: a first flock on wave 11, then every third wave, a big
+    /// flock on boss waves, and a few on most waves from 30 on.
+    private static func flyers(forWave number: Int, n: (Int) -> Int, every: (TimeInterval) -> TimeInterval) -> [SpawnGroup] {
+        if number == 11 {
+            return [SpawnGroup(kind: .pterodactyl, count: 6, every: 1.2, startAt: 5)]
+        }
+        if number % 10 == 0 {
+            return [SpawnGroup(kind: .pterodactyl, count: n(7), every: every(0.8), startAt: 15)]
+        }
+        if number >= 12 && number % 3 == 0 {
+            return [SpawnGroup(kind: .pterodactyl, count: n(6), every: every(1.0), startAt: 4)]
+        }
+        if number >= 30 {
+            return [SpawnGroup(kind: .pterodactyl, count: n(3), every: every(1.4), startAt: 8)]
+        }
+        return []
     }
 
     /// Dinos get tougher every wave. `index` is zero based.

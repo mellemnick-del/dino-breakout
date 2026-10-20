@@ -35,10 +35,11 @@ struct DinoStyle {
     enum Head {
         case theropod(length: CGFloat, widths: [CGFloat], teeth: Int, brow: Bool)
         case trike(length: CGFloat)
+        case ptero(length: CGFloat)
     }
 
     enum Marks {
-        case spots, stripes, ridge, blotches
+        case spots, stripes, ridge, blotches, plain
     }
 
     let skin: UIColor
@@ -63,6 +64,8 @@ struct DinoStyle {
     let marks: Marks
     /// Length on the board, in grid cells.
     let cells: CGFloat
+    /// How far each wing reaches from the body, in art units. Zero for walkers.
+    var wingSpan: CGFloat = 0
 
     var length: CGFloat { -(spine.last?.x ?? 0) }
 
@@ -70,6 +73,7 @@ struct DinoStyle {
         switch head {
         case .theropod(let length, _, _, _): length
         case .trike(let length): length
+        case .ptero(let length): length
         }
     }
 
@@ -144,6 +148,17 @@ extension DinoKind {
                 head: .theropod(length: 50, widths: [32, 40, 38, 30, 20], teeth: 7, brow: true),
                 marks: .ridge, cells: 2.25
             )
+        case .pterodactyl:
+            DinoStyle(
+                skin: UIColor(hex: 0xB4553A), light: UIColor(hex: 0xE38D5F), dark: UIColor(hex: 0x5E2A1C), eye: UIColor(hex: 0xF5D343),
+                spine: [(0, 6), (-4, 10), (-10, 13), (-16, 11), (-22, 6), (-28, 3), (-32, 1)],
+                hip: 16, sway: 0.5, wag: 2, wave: 0.1, stride: 0, rate: 2.2,
+                legs: [],
+                arms: [],
+                head: .ptero(length: 26),
+                marks: .plain, cells: 1.0,
+                wingSpan: 46
+            )
         }
     }
 }
@@ -176,7 +191,7 @@ enum DinoArt {
         let maxWidth = style.spine.map { $0.w }.max() ?? 10
         let legReach = style.legs.map { $0.spread + $0.ry * 1.2 }.max() ?? 0
         let trikeReach: CGFloat = style.isTrike ? 38 : 0
-        let halfHeight = max(maxWidth / 2, legReach, trikeReach) + style.wag + 6
+        let halfHeight = max(maxWidth / 2, legReach, trikeReach, style.wingSpan) + style.wag + 6
         let left = style.length + 6
         let right = style.headLength * 1.2 + 6
         let size = CGSize(width: ceil((left + right) * s), height: ceil(halfHeight * 2 * s))
@@ -293,6 +308,10 @@ enum DinoArt {
         ctx.setStrokeColor(outline.cgColor)
         ctx.setLineWidth(lw)
 
+        if style.wingSpan > 0 {
+            drawWings(style, pts, phase: phase, lineWidth: lw, in: ctx)
+        }
+
         // Legs, under the body
         for leg in style.legs {
             let a = phase + leg.off
@@ -355,6 +374,8 @@ enum DinoArt {
             drawTheropodHead(style, length: length, widths: widths, teeth: teeth, brow: brow, lineWidth: lw, in: ctx)
         case .trike(let length):
             drawTrikeHead(style, length: length, in: ctx)
+        case .ptero(let length):
+            drawPteroHead(style, length: length, lineWidth: lw, in: ctx)
         }
         ctx.restoreGState()
     }
@@ -405,6 +426,8 @@ enum DinoArt {
                 ellipse(ctx, f.p.x + f.nx * f.p.w * 0.2 * side, f.p.y + f.ny * f.p.w * 0.2 * side, f.p.w * 0.12, f.p.w * 0.1)
                 fill(ctx, style.dark)
             }
+        case .plain:
+            break
         case .blotches:
             for i in 1...5 where i < pts.count {
                 let f = frameAt(pts, i)
@@ -489,6 +512,82 @@ enum DinoArt {
                 ctx.setLineWidth(lw)
                 ctx.setStrokeColor(outline.cgColor)
             }
+        }
+    }
+
+    /// Leathery wings from shoulder to hip. They spread and fold as the phase turns.
+    private static func drawWings(_ style: DinoStyle, _ pts: [SpinePoint], phase: CGFloat, lineWidth lw: CGFloat, in ctx: CGContext) {
+        let flap = 0.55 + 0.45 * cos(phase)
+        let shoulderX: CGFloat = -6
+        let hipX: CGFloat = -20
+        let base = bodyY(pts, at: shoulderX)
+        let hipY = bodyY(pts, at: hipX)
+        for side: CGFloat in [1, -1] {
+            let reach = side * style.wingSpan * flap
+            let shoulder = CGPoint(x: shoulderX, y: base + side * 4)
+            let elbow = CGPoint(x: shoulderX + 7, y: base + reach * 0.35)
+            let wrist = CGPoint(x: shoulderX + 5, y: base + reach * 0.62)
+            let tip = CGPoint(x: shoulderX - 10, y: base + reach)
+            let hip = CGPoint(x: hipX, y: hipY + side * 3)
+
+            ctx.move(to: shoulder)
+            ctx.addQuadCurve(to: wrist, control: elbow)
+            ctx.addLine(to: tip)
+            ctx.addQuadCurve(to: CGPoint(x: hipX - 2, y: base + reach * 0.5), control: CGPoint(x: hipX - 8, y: base + reach * 0.85))
+            ctx.addQuadCurve(to: hip, control: CGPoint(x: hipX - 6, y: hipY + reach * 0.2))
+            ctx.closePath()
+            paint(ctx, style.light)
+
+            // Darker membrane close to the body
+            ctx.move(to: shoulder)
+            ctx.addQuadCurve(to: CGPoint(x: shoulderX - 1, y: base + reach * 0.45), control: CGPoint(x: shoulderX + 3, y: base + reach * 0.3))
+            ctx.addQuadCurve(to: hip, control: CGPoint(x: hipX, y: hipY + reach * 0.3))
+            ctx.closePath()
+            fill(ctx, style.skin, alpha: 0.7)
+
+            // Wing bone along the leading edge, and the little wrist claw
+            ctx.move(to: shoulder)
+            ctx.addQuadCurve(to: wrist, control: elbow)
+            ctx.addLine(to: tip)
+            ctx.setStrokeColor(style.dark.cgColor)
+            ctx.setLineWidth(lw * 1.6)
+            ctx.strokePath()
+            ctx.move(to: wrist)
+            ctx.addLine(to: CGPoint(x: wrist.x + 4, y: wrist.y + side * 0.8))
+            ctx.setStrokeColor(claw.cgColor)
+            ctx.setLineWidth(lw * 1.2)
+            ctx.strokePath()
+            ctx.setStrokeColor(outline.cgColor)
+            ctx.setLineWidth(lw)
+        }
+    }
+
+    private static func drawPteroHead(_ style: DinoStyle, length L: CGFloat, lineWidth lw: CGFloat, in ctx: CGContext) {
+        // Crest sweeping back over the neck
+        ctx.move(to: CGPoint(x: L * 0.3, y: -3))
+        ctx.addLine(to: CGPoint(x: -L * 0.55, y: 0))
+        ctx.addLine(to: CGPoint(x: L * 0.3, y: 3))
+        ctx.closePath()
+        paint(ctx, style.dark)
+
+        // Head running into a long pointed beak
+        let hp = headProfile(L, [9, 10, 6, 3, 1.4])
+        drawHeadShape(style, hp, in: ctx)
+        ctx.move(to: CGPoint(x: L * 0.55, y: 0))
+        ctx.addLine(to: CGPoint(x: L * 1.02, y: 0))
+        ctx.setStrokeColor(style.dark.cgColor)
+        ctx.setLineWidth(lw * 0.8)
+        ctx.strokePath()
+        ctx.setStrokeColor(outline.cgColor)
+        ctx.setLineWidth(lw)
+
+        for side: CGFloat in [1, -1] {
+            ellipse(ctx, L * 0.22, side * 3.4, 1.9, 1.7)
+            paint(ctx, eyeWhite)
+            ellipse(ctx, L * 0.23, side * 3.4, 1.1, 1.1)
+            fill(ctx, style.eye)
+            ellipse(ctx, L * 0.24, side * 3.4, 0.35, 0.8)
+            fill(ctx, outline)
         }
     }
 

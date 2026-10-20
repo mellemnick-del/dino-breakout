@@ -36,7 +36,7 @@ final class MenuBackdrop: SKScene {
             addChild(rock)
         }
 
-        for kind in [DinoKind.compy, .raptor, .triceratops, .rex] {
+        for kind in [DinoKind.compy, .raptor, .triceratops, .rex, .pterodactyl] {
             _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: scale)
         }
         for _ in 0..<3 {
@@ -56,7 +56,7 @@ final class MenuBackdrop: SKScene {
 
     /// Sends one dino walking across the screen in a gentle line.
     private func wander(startAnywhere: Bool) {
-        let kinds: [DinoKind] = [.compy, .compy, .raptor, .raptor, .triceratops, .rex]
+        let kinds: [DinoKind] = [.compy, .compy, .raptor, .raptor, .triceratops, .rex, .pterodactyl, .pterodactyl]
         let kind = kinds.randomElement() ?? .raptor
         let baked = DinoArt.bake(kind, cellSize: cellSize, screenScale: ParkArt.screenScale)
         let style = kind.style
@@ -74,13 +74,15 @@ final class MenuBackdrop: SKScene {
 
         let dino = SKNode()
         dino.position = start
-        dino.zPosition = kind == .rex ? 6 : 5
+        dino.zPosition = kind.flies ? 8 : (kind == .rex ? 6 : 5)
         let angle = atan2(end.y - start.y, end.x - start.x)
 
         let shadow = SKShapeNode(ellipseOf: baked.shadowSize)
-        shadow.fillColor = SKColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.34)
+        shadow.fillColor = SKColor(red: 0.02, green: 0.05, blue: 0.02, alpha: kind.flies ? 0.22 : 0.34)
         shadow.strokeColor = .clear
-        shadow.position = CGPoint(x: cellSize * 0.05, y: -cellSize * 0.08)
+        shadow.position = kind.flies
+            ? CGPoint(x: cellSize * 0.35, y: -cellSize * 0.55)
+            : CGPoint(x: cellSize * 0.05, y: -cellSize * 0.08)
         shadow.zRotation = angle
         dino.addChild(shadow)
 

@@ -66,6 +66,8 @@ final class GameScene: SKScene {
     private var gateDoors: [(door: SKSpriteNode, closed: CGFloat, open: CGFloat)] = []
     private var chopper: SKNode?
     private var sparkTimer: TimeInterval = 1
+    /// Whether this game has warned about flyers yet.
+    private var warnedAboutFlyers = false
     /// Showing while the game is paused.
     private var pauseMenu: SKNode?
     /// Showing once the game is won or lost.
@@ -104,6 +106,7 @@ final class GameScene: SKScene {
 
         grid = Grid(level: level)
         gameOverOverlay = nil
+        warnedAboutFlyers = false
         towerPanel = nil
         selectedTower = nil
         selectedRing = nil
@@ -131,7 +134,7 @@ final class GameScene: SKScene {
         drawBoard()
 
         // Bake every dino's walk cycle now so the first spawn doesn't hitch
-        for kind in [DinoKind.compy, .raptor, .triceratops, .rex] {
+        for kind in [DinoKind.compy, .raptor, .triceratops, .rex, .pterodactyl] {
             _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: screenScale)
         }
 
@@ -447,7 +450,7 @@ final class GameScene: SKScene {
             hud.flash("Need $\(kind.cost)")
             return
         }
-        let occupied = dinos.flatMap { [$0.cell, $0.target] }
+        let occupied = dinos.filter { !$0.kind.flies }.flatMap { [$0.cell, $0.target] }
         if occupied.contains(cell) {
             hud.flash("Too close to a dino")
             return
@@ -539,6 +542,15 @@ final class GameScene: SKScene {
         world.addChild(dino)
         dinos.append(dino)
 
+        if kind.flies {
+            dino.flight = Flight(start: point(for: grid.spawn), end: point(for: grid.exit), weave: Bool.random() ? 1 : -1)
+            SoundBank.shared.play(.screech)
+            if !warnedAboutFlyers {
+                warnedAboutFlyers = true
+                hud.flash("Pterodactyls! They fly over fences, and flares can't reach them")
+            }
+        }
+
         if kind == .rex {
             hud.flash("🦖 The ground is shaking...")
             shakeWorld()
@@ -580,6 +592,12 @@ final class GameScene: SKScene {
         var escaped: [Dino] = []
         for dino in dinos {
             dino.tick(dt)
+            if dino.flight != nil {
+                if fly(dino, dt) {
+                    escaped.append(dino)
+                }
+                continue
+            }
             var budget = dino.currentSpeed * cellSize * CGFloat(dt)
             while budget > 0 {
                 let dest = point(for: dino.target)
@@ -623,12 +641,45 @@ final class GameScene: SKScene {
         }
     }
 
+    /// Moves a flyer along its weaving line. Returns true when it reaches the helipad.
+    private func fly(_ dino: Dino, _ dt: TimeInterval) -> Bool {
+        guard var flight = dino.flight else { return false }
+        flight.travelled += dino.currentSpeed * cellSize * CGFloat(dt)
+        dino.flight = flight
+        let dx = flight.end.x - flight.start.x
+        let dy = flight.end.y - flight.start.y
+        let total = max(1, hypot(dx, dy))
+        let f = min(1, flight.travelled / total)
+        let swoop = sin(f * .pi * 3) * sin(f * .pi) * cellSize * 0.9 * flight.weave
+        let next = CGPoint(
+            x: flight.start.x + dx * f - dy / total * swoop,
+            y: flight.start.y + dy * f + dx / total * swoop
+        )
+        let moved = hypot(next.x - dino.position.x, next.y - dino.position.y)
+        if moved > 0.01 {
+            dino.steer(toward: atan2(next.y - dino.position.y, next.x - dino.position.x), dt: dt)
+        }
+        dino.position = next
+        return f >= 1
+    }
+
+    /// How close a dino is to the helipad, in squares. Towers shoot the closest first.
+    private func stepsLeft(_ dino: Dino) -> CGFloat {
+        if let flight = dino.flight {
+            let total = hypot(flight.end.x - flight.start.x, flight.end.y - flight.start.y)
+            return max(0, total - flight.travelled) / cellSize
+        }
+        return CGFloat(grid.distance(at: dino.target))
+    }
+
     private func fireTowers(_ dt: TimeInterval) {
         for tower in towers.values where tower.kind != .fence {
             tower.cooldown -= dt
             guard tower.cooldown <= 0 else { continue }
             let reach = tower.range * cellSize
-            let inRange = dinos.filter { !$0.isDead && distance($0.position, tower.position) <= reach }
+            let inRange = dinos.filter {
+                !$0.isDead && !(tower.kind == .flare && $0.kind.flies) && distance($0.position, tower.position) <= reach
+            }
             guard !inRange.isEmpty else { continue }
             tower.cooldown = tower.kind.fireInterval
 
@@ -639,7 +690,7 @@ final class GameScene: SKScene {
                 for dino in inRange {
                     hit(dino, for: tower.damage)
                 }
-            } else if let target = inRange.min(by: { grid.distance(at: $0.target) < grid.distance(at: $1.target) }) {
+            } else if let target = inRange.min(by: { stepsLeft($0) < stepsLeft($1) }) {
                 // Shoot whichever dino is closest to escaping.
                 tower.aim(at: target.position)
                 fire(from: tower, at: target)

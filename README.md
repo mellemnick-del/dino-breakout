@@ -46,6 +46,7 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 | Raptor | The fastest thing in the park |
 | Triceratops | Slow and very tough, costs 2 lives if it gets through |
 | T-Rex | Boss. Shakes the screen on arrival, costs 10 lives |
+| Pterodactyl | Flies straight over the maze from the gate to the chopper, weaving as it goes. Turrets and tranqs can hit it, flares can't. First flock on wave 11, then every third wave, a big flock on boss waves, and a few on most waves from 30 on |
 
 The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed.
 
