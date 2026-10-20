@@ -1,7 +1,7 @@
 import SpriteKit
 
 enum BuildKind: CaseIterable {
-    case fence, tranq, turret, flare
+    case fence, tranq, turret, flare, flak
 
     var title: String {
         switch self {
@@ -9,6 +9,7 @@ enum BuildKind: CaseIterable {
         case .tranq: "Tranq"
         case .turret: "Turret"
         case .flare: "Flare"
+        case .flak: "Flak"
         }
     }
 
@@ -18,6 +19,7 @@ enum BuildKind: CaseIterable {
         case .tranq: 20
         case .turret: 35
         case .flare: 50
+        case .flak: 45
         }
     }
 
@@ -28,6 +30,7 @@ enum BuildKind: CaseIterable {
         case .tranq: 2.6
         case .turret: 2.2
         case .flare: 1.4
+        case .flak: 3.2
         }
     }
 
@@ -37,6 +40,7 @@ enum BuildKind: CaseIterable {
         case .tranq: 0.9
         case .turret: 0.35
         case .flare: 1.4
+        case .flak: 0.6
         }
     }
 
@@ -46,7 +50,23 @@ enum BuildKind: CaseIterable {
         case .tranq: 5
         case .turret: 8
         case .flare: 16
+        case .flak: 22
         }
+    }
+
+    /// Flares burn the ground, so they can't reach flyers.
+    var hitsAir: Bool {
+        self != .flare && self != .fence
+    }
+
+    /// Flak is built for the sky and can't hit anything walking.
+    var hitsGround: Bool {
+        self != .flak && self != .fence
+    }
+
+    /// Flak shells burst and also hit flyers this close to the target, in squares.
+    var splash: CGFloat {
+        self == .flak ? 0.9 : 0
     }
 
     /// Tranq darts slow dinos to half speed for a moment.
@@ -60,6 +80,7 @@ enum BuildKind: CaseIterable {
         case .tranq: SKColor(red: 0.25, green: 0.55, blue: 0.85, alpha: 1)
         case .turret: SKColor(red: 0.45, green: 0.47, blue: 0.5, alpha: 1)
         case .flare: SKColor(red: 0.9, green: 0.45, blue: 0.15, alpha: 1)
+        case .flak: SKColor(red: 0.36, green: 0.42, blue: 0.21, alpha: 1)
         }
     }
 }

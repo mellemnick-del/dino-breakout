@@ -1,7 +1,7 @@
 import AVFoundation
 
 enum Sound: CaseIterable {
-    case turret, tranq, flare, hit, dinoDown, roar, screech, alarm, place, upgrade, sell, escape, win, lose, zap
+    case turret, tranq, flare, flak, hit, dinoDown, roar, screech, alarm, place, upgrade, sell, escape, win, lose, zap
 
     /// How loud this one sits in the mix.
     var gain: Float {
@@ -9,6 +9,7 @@ enum Sound: CaseIterable {
         case .turret: 0.45
         case .tranq: 0.55
         case .flare: 0.7
+        case .flak: 0.6
         case .hit: 0.35
         case .dinoDown: 0.6
         case .roar: 1
@@ -25,6 +26,7 @@ enum Sound: CaseIterable {
     var minGap: TimeInterval {
         switch self {
         case .turret: 0.06
+        case .flak: 0.08
         case .hit: 0.05
         case .zap: 0.2
         case .screech: 0.8
@@ -162,6 +164,10 @@ final class SoundBank {
                 let swell = Float(pow(sin(.pi * min(1, t / 0.7)), 0.6)) * self.decay(t, 2.5)
                 let crackle: Float = Float.random(in: 0...1) > 0.995 ? self.noise() * 1.2 : 0
                 return lowpass(self.noise(), Float(0.05 + 0.25 * min(1, t * 4))) * swell * 1.6 + crackle * self.decay(t, 4)
+            }
+        case .flak:
+            return buffer(0.4) { t, _ in
+                self.sine(75 - t * 60, t) * self.decay(t, 9) * 0.8 + lowpass(self.noise(), 0.25) * self.decay(t, 14) * 0.9
             }
         case .hit:
             return buffer(0.05) { t, _ in self.sine(1800, t) * self.decay(t, 120) * 0.5 }

@@ -6,13 +6,16 @@ private final class Shot {
     let target: Dino
     let damage: CGFloat
     let slow: (factor: CGFloat, duration: TimeInterval)?
+    /// Flak bursts also hit flyers within this many squares.
+    let splash: CGFloat
     var done = false
 
-    init(node: SKSpriteNode, target: Dino, damage: CGFloat, slow: (factor: CGFloat, duration: TimeInterval)?) {
+    init(node: SKSpriteNode, target: Dino, damage: CGFloat, slow: (factor: CGFloat, duration: TimeInterval)?, splash: CGFloat = 0) {
         self.node = node
         self.target = target
         self.damage = damage
         self.slow = slow
+        self.splash = splash
     }
 }
 
@@ -547,7 +550,7 @@ final class GameScene: SKScene {
             SoundBank.shared.play(.screech)
             if !warnedAboutFlyers {
                 warnedAboutFlyers = true
-                hud.flash("Pterodactyls! They fly over fences, and flares can't reach them")
+                hud.flash("Pterodactyls! They fly over fences. Build Flak to shoot them down")
             }
         }
 
@@ -678,7 +681,9 @@ final class GameScene: SKScene {
             guard tower.cooldown <= 0 else { continue }
             let reach = tower.range * cellSize
             let inRange = dinos.filter {
-                !$0.isDead && !(tower.kind == .flare && $0.kind.flies) && distance($0.position, tower.position) <= reach
+                !$0.isDead
+                    && ($0.kind.flies ? tower.kind.hitsAir : tower.kind.hitsGround)
+                    && distance($0.position, tower.position) <= reach
             }
             guard !inRange.isEmpty else { continue }
             tower.cooldown = tower.kind.fireInterval
@@ -700,17 +705,24 @@ final class GameScene: SKScene {
 
     private func fire(from tower: Tower, at target: Dino) {
         tower.showFire()
-        let isDart = tower.kind == .tranq
-        SoundBank.shared.play(isDart ? .tranq : .turret)
-        let node = isDart
-            ? SKSpriteNode(texture: ParkArt.dart(cell: cellSize), size: CGSize(width: cellSize * 0.26, height: cellSize * 0.1))
-            : SKSpriteNode(texture: ParkArt.tracer(cell: cellSize), size: CGSize(width: cellSize * 0.3, height: cellSize * 0.1))
+        let node: SKSpriteNode
+        switch tower.kind {
+        case .tranq:
+            SoundBank.shared.play(.tranq)
+            node = SKSpriteNode(texture: ParkArt.dart(cell: cellSize), size: CGSize(width: cellSize * 0.26, height: cellSize * 0.1))
+        case .flak:
+            SoundBank.shared.play(.flak)
+            node = SKSpriteNode(texture: ParkArt.flakShell(cell: cellSize), size: CGSize(width: cellSize * 0.22, height: cellSize * 0.12))
+        default:
+            SoundBank.shared.play(.turret)
+            node = SKSpriteNode(texture: ParkArt.tracer(cell: cellSize), size: CGSize(width: cellSize * 0.3, height: cellSize * 0.1))
+        }
         let angle = atan2(target.position.y - tower.position.y, target.position.x - tower.position.x)
         node.zRotation = angle
         node.position = CGPoint(x: tower.position.x + cos(angle) * cellSize * 0.45, y: tower.position.y + sin(angle) * cellSize * 0.45)
         node.zPosition = 7
         world.addChild(node)
-        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow))
+        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow, splash: tower.kind.splash))
     }
 
     private func moveShots(_ dt: TimeInterval) {
@@ -726,8 +738,17 @@ final class GameScene: SKScene {
             let dist = hypot(dx, dy)
             shot.node.zRotation = atan2(dy, dx)
             if dist <= step {
-                puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
-                SoundBank.shared.play(.hit)
+                if shot.splash > 0 {
+                    flakBurst(at: shot.target.position)
+                    let reach = shot.splash * cellSize
+                    let center = shot.target.position
+                    for other in dinos where other !== shot.target && other.kind.flies && distance(other.position, center) <= reach {
+                        hit(other, for: shot.damage * 0.5)
+                    }
+                } else {
+                    puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
+                    SoundBank.shared.play(.hit)
+                }
                 hit(shot.target, for: shot.damage, slow: shot.slow)
                 shot.node.removeFromParent()
                 shot.done = true
@@ -985,6 +1006,32 @@ final class GameScene: SKScene {
                 .removeFromParent()
             ]))
         }
+    }
+
+    /// A flak shell going off: an orange flash inside a dark smoke ball.
+    private func flakBurst(at point: CGPoint) {
+        let smoke = SKShapeNode(circleOfRadius: cellSize * 0.35)
+        smoke.fillColor = SKColor(white: 0.18, alpha: 0.75)
+        smoke.strokeColor = SKColor(white: 0.08, alpha: 0.8)
+        smoke.lineWidth = 2
+        smoke.position = point
+        smoke.zPosition = 9.5
+        smoke.setScale(0.3)
+        world.addChild(smoke)
+        smoke.run(.sequence([
+            .group([.scale(to: 1.2, duration: 0.35), .sequence([.wait(forDuration: 0.15), .fadeOut(withDuration: 0.3)])]),
+            .removeFromParent()
+        ]))
+        let flash = SKShapeNode(circleOfRadius: cellSize * 0.18)
+        flash.fillColor = ParkArt.flareLight
+        flash.strokeColor = .clear
+        flash.position = point
+        flash.zPosition = 9.6
+        world.addChild(flash)
+        flash.run(.sequence([
+            .group([.scale(to: 1.6, duration: 0.12), .fadeOut(withDuration: 0.12)]),
+            .removeFromParent()
+        ]))
     }
 
     private func puff(at point: CGPoint, color: UIColor) {

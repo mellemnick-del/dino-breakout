@@ -27,6 +27,9 @@ enum ParkArt {
     static let tube = UIColor(hex: 0xA8301C)
     static let wire = UIColor(hex: 0xD6DEE2)
     static let olive = UIColor(hex: 0x5B6A35)
+    static let oliveLight = UIColor(hex: 0x8A9A55)
+    static let oliveDark = UIColor(hex: 0x3E4A24)
+    static let marking = UIColor(hex: 0xC0392B)
     static let glass = UIColor(hex: 0x9FD3F0)
     static let hull = UIColor(hex: 0xECE8DC)
     static let rescue = UIColor(hex: 0xE2593F)
@@ -96,6 +99,8 @@ enum ParkArt {
         case (.tranq, 3): [-c * 0.045, c * 0.045]
         case (.turret, 2): [-c * 0.07, c * 0.07]
         case (.tranq, _), (.turret, _): [0]
+        case (.flak, 1): [-c * 0.06, c * 0.06]
+        case (.flak, _): [-c * 0.105, -c * 0.035, c * 0.035, c * 0.105]
         default: []
         }
     }
@@ -190,6 +195,14 @@ enum ParkArt {
             line(ctx, CGPoint(x: -len / 2, y: 0), CGPoint(x: len / 2, y: 0), UIColor(hex: 0xF4F6F2), 2)
             circle(ctx, -len / 2, 0, c * 0.04)
             fill(ctx, tranq)
+        }
+    }
+
+    static func flakShell(cell c: CGFloat) -> SKTexture {
+        texture("shell-\(Int(c))", size: CGSize(width: c * 0.22, height: c * 0.12)) { ctx in
+            line(ctx, CGPoint(x: -c * 0.08, y: 0), CGPoint(x: c * 0.04, y: 0), UIColor(red: 1, green: 0.75, blue: 0.4, alpha: 0.4), c * 0.06)
+            circle(ctx, c * 0.04, 0, c * 0.035)
+            ink(ctx, UIColor(hex: 0xFFD27A), max(1, c * 0.02))
         }
     }
 
@@ -617,6 +630,15 @@ enum ParkArt {
             ctx.setFillColor(flare.cgColor)
             ctx.fill(CGRect(x: -h, y: -h, width: p, height: p * 0.07))
             ctx.fill(CGRect(x: -h, y: h - p * 0.07, width: p, height: p * 0.07))
+        case .flak:
+            ctx.setFillColor(olive.cgColor)
+            ctx.fill(CGRect(x: -h, y: -h, width: p * 0.12, height: p))
+            ctx.fill(CGRect(x: h - p * 0.12, y: -h, width: p * 0.12, height: p))
+            ctx.setFillColor(marking.cgColor)
+            for y in [-h + p * 0.18, h - p * 0.26] {
+                ctx.fill(CGRect(x: -h, y: y, width: p * 0.12, height: p * 0.08))
+                ctx.fill(CGRect(x: h - p * 0.12, y: y, width: p * 0.12, height: p * 0.08))
+            }
         case .fence:
             break
         }
@@ -654,6 +676,7 @@ enum ParkArt {
         case .tranq: drawTranqHead(ctx, level: level, cell: c)
         case .turret: drawTurretHead(ctx, level: level, cell: c)
         case .flare: drawFlareHead(ctx, level: level, cell: c, frame: frame)
+        case .flak: drawFlakHead(ctx, level: level, cell: c)
         case .fence: break
         }
     }
@@ -754,6 +777,51 @@ enum ParkArt {
         ctx.strokePath()
         circle(ctx, c * 0.07, 0, c * 0.035)
         fill(ctx, rescue)
+    }
+
+    private static func drawFlakHead(_ ctx: CGContext, level: Int, cell c: CGFloat) {
+        let lw = lineWidth(c)
+        // Turntable
+        circle(ctx, 0, 0, c * 0.23)
+        ink(ctx, oliveDark, lw)
+        circle(ctx, 0, 0, c * 0.17)
+        ctx.setStrokeColor(olive.cgColor)
+        ctx.setLineWidth(lw)
+        ctx.strokePath()
+
+        // Radar dish on the back at level 3
+        if level >= 3 {
+            line(ctx, CGPoint(x: -c * 0.12, y: 0), CGPoint(x: -c * 0.2, y: 0), outline, lw * 2.4)
+            ctx.addEllipse(in: CGRect(x: -c * 0.3, y: -c * 0.11, width: c * 0.14, height: c * 0.22))
+            ink(ctx, steelLight, lw)
+            circle(ctx, -c * 0.23, 0, c * 0.025)
+            fill(ctx, marking)
+        }
+
+        // Barrels with muzzle brakes
+        let tip = c * 0.48
+        for y in muzzles(.flak, level: level, cell: c) {
+            rr(ctx, c * 0.06, y - c * 0.022, tip - c * 0.06, c * 0.044, c * 0.015)
+            ink(ctx, steelDark, lw)
+            rr(ctx, tip - c * 0.05, y - c * 0.032, c * 0.05, c * 0.064, c * 0.012)
+            ink(ctx, steel, lw * 0.8)
+        }
+
+        // Gun cradle with sky-target markings
+        rr(ctx, -c * 0.15, -c * 0.15, c * 0.27, c * 0.3, c * 0.06)
+        ink(ctx, olive, lw)
+        rr(ctx, -c * 0.11, -c * 0.11, c * 0.18, c * 0.09, c * 0.03)
+        fill(ctx, oliveLight, 0.55)
+        ctx.setFillColor(marking.cgColor)
+        ctx.fill(CGRect(x: c * 0.02, y: -c * 0.15 + lw, width: c * 0.04, height: c * 0.3 - lw * 2))
+        circle(ctx, -c * 0.04, c * 0.05, c * 0.035)
+        ink(ctx, .white, lw * 0.6)
+        circle(ctx, -c * 0.04, c * 0.05, c * 0.014)
+        fill(ctx, marking)
+
+        // Gun shield across the front
+        rr(ctx, c * 0.11, -c * 0.19, c * 0.05, c * 0.38, c * 0.02)
+        ink(ctx, oliveDark, lw)
     }
 
     private static func drawFlareHead(_ ctx: CGContext, level: Int, cell c: CGFloat, frame: Int) {
