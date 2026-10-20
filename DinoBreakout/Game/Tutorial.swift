@@ -73,8 +73,11 @@ final class Tutorial {
     func handle(_ event: Event) {
         guard !isDone else { return }
         switch (step, event) {
-        case (.fences, .fenceBuilt(let total)) where total >= 4,
-             (.turret, .towerBuilt),
+        case (.fences, .fenceBuilt(let total)):
+            if total >= 4 {
+                advance()
+            }
+        case (.turret, .towerBuilt),
              (.send, .waveStarted),
              (.firstWave, .waveCleared),
              (.upgrade, .upgraded):
