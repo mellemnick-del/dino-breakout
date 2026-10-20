@@ -37,6 +37,7 @@ enum HUDAction {
     case pause
     case sendWave
     case pick(Tool)
+    case airstrike
 }
 
 /// Top bar (lives, cash, wave, Send Wave) and the build bar along the bottom.
@@ -51,6 +52,9 @@ final class HUD: SKNode {
     /// Floats over the bottom of the board while a message shows.
     private let messagePill = SKShapeNode()
     private var toolButtons: [(tool: Tool, node: SKShapeNode)] = []
+    /// The air strike sits in the build bar's last slot, off the board.
+    private var strikeButton = SKShapeNode()
+    private let strikeStatus = makeLabel("Ready", size: 11, color: Palette.warning)
     private var messageMaxWidth: CGFloat = 300
 
     init(size: CGSize, topHeight: CGFloat, bottomHeight: CGFloat, topInset: CGFloat, bottomInset: CGFloat) {
@@ -79,11 +83,15 @@ final class HUD: SKNode {
         let coin = SKSpriteNode(texture: ParkArt.coinIcon(size: 20), size: CGSize(width: 20, height: 20))
         coin.position = CGPoint(x: 112, y: midY)
         addChild(coin)
-        for (label, x) in [(livesLabel, 74.0), (cashLabel, 124.0), (waveLabel, 172.0)] {
+        for (label, x) in [(livesLabel, 74.0), (cashLabel, 124.0)] {
             label.horizontalAlignmentMode = .left
             label.position = CGPoint(x: x, y: midY)
             addChild(label)
         }
+        // The wave count sits just left of the Send Wave button, clear of the cash
+        waveLabel.horizontalAlignmentMode = .right
+        waveLabel.position = CGPoint(x: size.width - 12 - 104 - 10, y: midY)
+        addChild(waveLabel)
 
         sendButton.position = CGPoint(x: size.width - 12 - 52, y: midY)
         sendButton.lineWidth = 0
@@ -106,10 +114,12 @@ final class HUD: SKNode {
         messagePill.addChild(message)
         messageMaxWidth = size.width - 24
 
-        let tools: [Tool] = BuildKind.allCases.map { .build($0) } + [.sell]
+        // Five build buttons, then the air strike. Selling lives in each tower's panel.
+        let tools: [Tool] = BuildKind.allCases.map { .build($0) }
+        let slots = tools.count + 1
         let gap: CGFloat = 6
         let pad: CGFloat = 10
-        let width = (size.width - pad * 2 - gap * CGFloat(tools.count - 1)) / CGFloat(tools.count)
+        let width = (size.width - pad * 2 - gap * CGFloat(slots - 1)) / CGFloat(slots)
         let height = bottomHeight - bottomInset - 12
         for (i, tool) in tools.enumerated() {
             let button = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 10)
@@ -139,6 +149,21 @@ final class HUD: SKNode {
             addChild(button)
             toolButtons.append((tool, button))
         }
+
+        strikeButton = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 10)
+        strikeButton.fillColor = Palette.panel
+        strikeButton.strokeColor = SKColor(white: 1, alpha: 0.15)
+        strikeButton.position = CGPoint(x: pad + width / 2 + CGFloat(tools.count) * (width + gap), y: bottomInset + 6 + height / 2)
+        let chopper = SKSpriteNode(texture: ParkArt.chopperBody(size: 26), size: CGSize(width: 36, height: 13))
+        chopper.zRotation = .pi / 2
+        chopper.position = CGPoint(x: 0, y: 12)
+        strikeButton.addChild(chopper)
+        let strikeTitle = makeLabel("Strike", size: 12)
+        strikeTitle.position = CGPoint(x: 0, y: -12)
+        strikeButton.addChild(strikeTitle)
+        strikeStatus.position = CGPoint(x: 0, y: -25)
+        strikeButton.addChild(strikeStatus)
+        addChild(strikeButton)
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -173,6 +198,32 @@ final class HUD: SKNode {
         sendLabel.text = "Speed \(speed)x"
         sendButton.fillColor = speed == 1 ? Palette.panel : SKColor(red: 0.25, green: 0.53, blue: 0.79, alpha: 1)
         sendLabel.fontColor = Palette.text
+    }
+
+    /// Ready, armed (waiting for a tap on the board), or used until the next wave.
+    func setStrike(ready: Bool, armed: Bool) {
+        if armed {
+            strikeButton.fillColor = Palette.danger
+            strikeButton.strokeColor = .white
+            strikeButton.lineWidth = 3
+            strikeStatus.text = "Tap board"
+            strikeStatus.fontColor = Palette.text
+            strikeButton.alpha = 1
+        } else if ready {
+            strikeButton.fillColor = Palette.panel
+            strikeButton.strokeColor = Palette.warning.withAlphaComponent(0.6)
+            strikeButton.lineWidth = 1.5
+            strikeStatus.text = "Ready"
+            strikeStatus.fontColor = Palette.warning
+            strikeButton.alpha = 1
+        } else {
+            strikeButton.fillColor = Palette.panel
+            strikeButton.strokeColor = SKColor(white: 1, alpha: 0.15)
+            strikeButton.lineWidth = 1
+            strikeStatus.text = "Next wave"
+            strikeStatus.fontColor = Palette.muted
+            strikeButton.alpha = 0.55
+        }
     }
 
     func select(_ tool: Tool?) {
@@ -220,6 +271,9 @@ final class HUD: SKNode {
         }
         if let hit = toolButtons.first(where: { $0.node.contains(point) }) {
             return .pick(hit.tool)
+        }
+        if strikeButton.contains(point) {
+            return .airstrike
         }
         return nil
     }

@@ -139,7 +139,6 @@ final class GameScene: SKScene {
     private var airstrikeReady = true
     /// Waiting for the player to pick where the strike goes.
     private var airstrikeArmed = false
-    private var airstrikeButton: SKNode?
 
     /// Waves to win: 50, or 20 for the daily challenge.
     private var waveGoal: Int {
@@ -245,7 +244,7 @@ final class GameScene: SKScene {
         lastAdBonusWave = -99
         airstrikeReady = true
         airstrikeArmed = false
-        buildAirstrikeButton()
+        updateAirstrikeButton()
         tutorial = nil
         if level.id == Level.all.first?.id, challenge == nil, !endless, !Tutorial.hasFinished {
             let guide = Tutorial(size: size, topY: size.height - topHeight) { [weak self] step in
@@ -546,10 +545,6 @@ final class GameScene: SKScene {
         if let tutorial, tutorial.handleTap(at: touch.location(in: self)) {
             return
         }
-        if let button = airstrikeButton, button.calculateAccumulatedFrame().contains(touch.location(in: self)) {
-            toggleAirstrike()
-            return
-        }
         if airstrikeArmed {
             let point = touch.location(in: world)
             if point.y > origin.y && point.y < origin.y + cellSize * CGFloat(rows) {
@@ -602,6 +597,8 @@ final class GameScene: SKScene {
             case .pick(let picked):
                 tool = picked
                 hud.select(tool)
+            case .airstrike:
+                toggleAirstrike()
             }
             return
         }
@@ -1265,40 +1262,8 @@ final class GameScene: SKScene {
 
     // MARK: - Air strike
 
-    private func buildAirstrikeButton() {
-        let button = SKNode()
-        button.zPosition = 60
-        button.position = CGPoint(x: size.width - 38, y: bottomHeight + 70)
-        let ring = SKShapeNode(circleOfRadius: 27)
-        ring.name = "ring"
-        ring.lineWidth = 2.5
-        button.addChild(ring)
-        let icon = SKSpriteNode(texture: ParkArt.chopperBody(size: 30), size: CGSize(width: 42, height: 15))
-        icon.zRotation = .pi / 2
-        icon.position = CGPoint(x: 0, y: 4)
-        button.addChild(icon)
-        let label = makeLabel("STRIKE", size: 9, font: Fonts.heavy)
-        label.name = "label"
-        label.position = CGPoint(x: 0, y: -16)
-        button.addChild(label)
-        addChild(button)
-        airstrikeButton = button
-        updateAirstrikeButton()
-    }
-
     private func updateAirstrikeButton() {
-        guard let button = airstrikeButton, let ring = button.childNode(withName: "ring") as? SKShapeNode else { return }
-        if airstrikeArmed {
-            ring.fillColor = Palette.danger
-            ring.strokeColor = .white
-        } else if airstrikeReady {
-            ring.fillColor = Palette.bar.withAlphaComponent(0.9)
-            ring.strokeColor = Palette.warning
-        } else {
-            ring.fillColor = Palette.bar.withAlphaComponent(0.6)
-            ring.strokeColor = Palette.muted
-        }
-        button.alpha = airstrikeReady ? 1 : 0.45
+        hud?.setStrike(ready: airstrikeReady, armed: airstrikeArmed)
     }
 
     private func toggleAirstrike() {
