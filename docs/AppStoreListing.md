@@ -72,7 +72,7 @@ Game Center is Apple's service and doesn't change these answers.
 ## Also required
 
 - **Support URL:** any page with a way to contact you. A simple page on a free site is fine.
-- **Privacy policy URL:** required even when no data is collected. One short page saying the app collects no data.
+- **Privacy policy URL:** the ready-made page in `docs/site/privacy.html`, which covers the optional AdMob ads.
 - **Copyright:** "2026" followed by your name or business name.
 
 ## Screenshots
