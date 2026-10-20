@@ -25,7 +25,7 @@ final class GameScene: SKScene {
     private let cols = Level.cols
     private let rows = Level.rows
     private let topHeight: CGFloat = 60
-    private let bottomHeight: CGFloat = 120
+    private let bottomHeight: CGFloat = 108
 
     let level: Level
     let difficulty: Difficulty

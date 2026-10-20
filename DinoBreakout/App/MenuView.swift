@@ -292,7 +292,7 @@ private struct ParkCard: View {
     var body: some View {
         HStack(spacing: 14) {
             ParkMap(level: level)
-                .frame(width: 52, height: 82)
+                .frame(width: 52, height: 87)
                 .opacity(locked ? 0.4 : 1)
             VStack(alignment: .leading, spacing: 4) {
                 Text(level.name)

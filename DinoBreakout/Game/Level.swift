@@ -4,7 +4,7 @@ import Foundation
 /// where the dinos break out, where the chopper waits, and the terrain in the way.
 struct Level: Identifiable, Hashable {
     static let cols = 9
-    static let rows = 13
+    static let rows = 15
 
     let id: String
     let name: String
@@ -43,64 +43,64 @@ struct Level: Identifiable, Hashable {
             id: "paddock-b",
             name: "Paddock B",
             blurb: "Open field, gate to helipad. The classic breakout.",
-            spawn: Cell(col: 4, row: 12),
+            spawn: Cell(col: 4, row: 14),
             exit: Cell(col: 4, row: 0)
         ),
         Level(
             id: "raptor-ridge",
             name: "Raptor Ridge",
             blurb: "Boulders everywhere, and the chopper's in the far corner.",
-            spawn: Cell(col: 0, row: 12),
+            spawn: Cell(col: 0, row: 14),
             exit: Cell(col: 8, row: 0),
             rocks: [
-                Cell(col: 2, row: 10), Cell(col: 3, row: 10), Cell(col: 6, row: 9),
-                Cell(col: 1, row: 8), Cell(col: 4, row: 7), Cell(col: 7, row: 6),
-                Cell(col: 2, row: 5), Cell(col: 5, row: 4), Cell(col: 0, row: 3),
-                Cell(col: 3, row: 2), Cell(col: 6, row: 2), Cell(col: 5, row: 1)
+                Cell(col: 2, row: 11), Cell(col: 3, row: 11), Cell(col: 6, row: 10),
+                Cell(col: 1, row: 9), Cell(col: 4, row: 8), Cell(col: 7, row: 7),
+                Cell(col: 2, row: 6), Cell(col: 5, row: 5), Cell(col: 0, row: 4),
+                Cell(col: 3, row: 3), Cell(col: 6, row: 3), Cell(col: 5, row: 2)
             ]
         ),
         Level(
             id: "jungle-river",
             name: "Jungle River",
             blurb: "A river splits the park. Two bridges, and the dinos know it.",
-            spawn: Cell(col: 4, row: 12),
+            spawn: Cell(col: 4, row: 14),
             exit: Cell(col: 4, row: 0),
-            water: [0, 2, 3, 4, 5, 6, 8].map { Cell(col: $0, row: 6) },
-            bridges: [Cell(col: 1, row: 6), Cell(col: 7, row: 6)]
+            water: [0, 2, 3, 4, 5, 6, 8].map { Cell(col: $0, row: 7) },
+            bridges: [Cell(col: 1, row: 7), Cell(col: 7, row: 7)]
         ),
         Level(
             id: "visitor-center",
             name: "Visitor Center",
             blurb: "The dinos are loose in the tourist area. Maze them around the buildings.",
-            spawn: Cell(col: 0, row: 12),
+            spawn: Cell(col: 0, row: 14),
             exit: Cell(col: 8, row: 0),
             buildings: [
-                Cell(col: 2, row: 9), Cell(col: 3, row: 9), Cell(col: 2, row: 8), Cell(col: 3, row: 8),
-                Cell(col: 6, row: 10), Cell(col: 7, row: 10),
-                Cell(col: 5, row: 6), Cell(col: 6, row: 6), Cell(col: 5, row: 5), Cell(col: 6, row: 5),
-                Cell(col: 1, row: 4), Cell(col: 1, row: 3),
-                Cell(col: 3, row: 2), Cell(col: 4, row: 2)
+                Cell(col: 2, row: 10), Cell(col: 3, row: 10), Cell(col: 2, row: 9), Cell(col: 3, row: 9),
+                Cell(col: 6, row: 11), Cell(col: 7, row: 11),
+                Cell(col: 5, row: 7), Cell(col: 6, row: 7), Cell(col: 5, row: 6), Cell(col: 6, row: 6),
+                Cell(col: 1, row: 5), Cell(col: 1, row: 4),
+                Cell(col: 3, row: 3), Cell(col: 4, row: 3)
             ]
         ),
         Level(
             id: "aviary",
             name: "The Aviary",
             blurb: "Someone left the aviary open. Pterodactyls from wave 3.",
-            spawn: Cell(col: 4, row: 12),
+            spawn: Cell(col: 4, row: 14),
             exit: Cell(col: 4, row: 0),
-            rocks: [Cell(col: 1, row: 10), Cell(col: 7, row: 10), Cell(col: 4, row: 6), Cell(col: 1, row: 2), Cell(col: 7, row: 2)],
+            rocks: [Cell(col: 1, row: 11), Cell(col: 7, row: 11), Cell(col: 4, row: 7), Cell(col: 1, row: 3), Cell(col: 7, row: 3)],
             flyerHeavy: true
         ),
         Level(
             id: "mount-ember",
             name: "Mount Ember",
             blurb: "Lava pools on the slopes of a waking volcano. The hardest park.",
-            spawn: Cell(col: 4, row: 12),
+            spawn: Cell(col: 4, row: 14),
             exit: Cell(col: 4, row: 0),
             lava: [
-                Cell(col: 1, row: 9), Cell(col: 2, row: 9), Cell(col: 6, row: 9), Cell(col: 7, row: 9),
-                Cell(col: 3, row: 6), Cell(col: 4, row: 6), Cell(col: 5, row: 6),
-                Cell(col: 0, row: 3), Cell(col: 1, row: 3), Cell(col: 7, row: 3), Cell(col: 8, row: 3)
+                Cell(col: 1, row: 10), Cell(col: 2, row: 10), Cell(col: 6, row: 10), Cell(col: 7, row: 10),
+                Cell(col: 3, row: 7), Cell(col: 4, row: 7), Cell(col: 5, row: 7),
+                Cell(col: 0, row: 4), Cell(col: 1, row: 4), Cell(col: 7, row: 4), Cell(col: 8, row: 4)
             ],
             ash: true
         )

@@ -95,7 +95,7 @@ DinoBreakout/
 
 ### How the pathfinding works
 
-`Grid` keeps a distance map: for every square, how many steps it is to the helipad. Each dino just steps to whichever neighbor is closest. When you place or sell something, the map is rebuilt (a breadth first search, instant on a 9 x 13 board), and every dino reroutes on its next step. Placements are only allowed if the paddock gate, and every square a dino is standing on or heading to, can still reach the helipad.
+`Grid` keeps a distance map: for every square, how many steps it is to the helipad. Each dino just steps to whichever neighbor is closest. When you place or sell something, the map is rebuilt (a breadth first search, instant on a 9 x 15 board), and every dino reroutes on its next step. Placements are only allowed if the paddock gate, and every square a dino is standing on or heading to, can still reach the helipad.
 
 ### Tuning
 
