@@ -27,6 +27,8 @@ struct Level: Identifiable, Hashable {
     var ash = false
     /// Pterodactyls on almost every wave, starting early.
     var flyerHeavy = false
+    /// Dark: you only see what your towers light up.
+    var night = false
 
     var terrain: Set<Cell> {
         Set(rocks + water + lava + buildings)
@@ -90,6 +92,15 @@ struct Level: Identifiable, Hashable {
             exit: Cell(col: 4, row: 0),
             rocks: [Cell(col: 1, row: 11), Cell(col: 7, row: 11), Cell(col: 4, row: 7), Cell(col: 1, row: 3), Cell(col: 7, row: 3)],
             flyerHeavy: true
+        ),
+        Level(
+            id: "night-shift",
+            name: "Night Shift",
+            blurb: "The power's out. You only see what your towers light up.",
+            spawn: Cell(col: 4, row: 14),
+            exit: Cell(col: 4, row: 0),
+            rocks: [Cell(col: 2, row: 10), Cell(col: 6, row: 9), Cell(col: 3, row: 5), Cell(col: 6, row: 4)],
+            night: true
         ),
         Level(
             id: "mount-ember",

@@ -82,7 +82,7 @@ enum Waves {
                 SpawnGroup(kind: .triceratops, count: n(5), every: every(1.8), startAt: 3),
                 SpawnGroup(kind: .rex, count: rexes, every: 6, startAt: 10),
                 SpawnGroup(kind: .compy, count: n(20), every: every(0.25), startAt: 12)
-            ]
+            ] + (number >= 30 ? [SpawnGroup(kind: .spinosaurus, count: 2, every: 5, startAt: 6)] : [])
         }
         switch number % 4 {
         case 0:
@@ -91,10 +91,15 @@ enum Waves {
                 SpawnGroup(kind: .raptor, count: n(8), every: every(0.6), startAt: 5)
             ]
         case 1:
-            return [
+            var rush = [
                 SpawnGroup(kind: .raptor, count: n(20), every: every(0.45)),
                 SpawnGroup(kind: .compy, count: n(12), every: every(0.3), startAt: 6)
             ]
+            // Spinosaurs from wave 17. On Jungle River they swim straight across.
+            if number >= 17 {
+                rush.append(SpawnGroup(kind: .spinosaurus, count: max(1, n(2) - 1), every: every(3), startAt: 5))
+            }
+            return rush
         case 2:
             // Armored columns: stegosaurs join the triceratops from wave 14
             var column = [
@@ -113,6 +118,10 @@ enum Waves {
             ]
             if number >= 13 {
                 mixed.append(SpawnGroup(kind: .stegosaurus, count: n(3), every: every(1.8), startAt: 8))
+            }
+            // Dilophosaurs from wave 19, spitting at towers along the way
+            if number >= 19 {
+                mixed.append(SpawnGroup(kind: .dilophosaurus, count: n(4), every: every(1.2), startAt: 2))
             }
             return mixed
         }

@@ -372,6 +372,12 @@ private struct ParkMap: View {
             context.fill(Path(rect(level.spawn)), with: .color(MenuColor.gate))
             context.fill(Path(rect(level.exit)), with: .color(MenuColor.pad))
             context.stroke(Path(ellipseIn: rect(level.exit).insetBy(dx: c * 0.2, dy: c * 0.2)), with: .color(MenuColor.hazard), lineWidth: 1)
+            if level.night {
+                context.fill(
+                    Path(CGRect(x: 0, y: 0, width: c * CGFloat(Level.cols), height: c * CGFloat(Level.rows))),
+                    with: .color(.black.opacity(0.55))
+                )
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.black.opacity(0.5), lineWidth: 1.5))

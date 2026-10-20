@@ -119,6 +119,10 @@ final class GameScene: SKScene {
     private var burns: [Burn] = []
     /// Numbers for the end of game screen.
     private var stats = GameStats()
+    /// Night parks: the darkness overlay.
+    private var darkness: SKSpriteNode?
+    /// Whether this game has explained venom yet.
+    private var warnedAboutSpit = false
     /// One chopper strafing run per wave.
     private var airstrikeReady = true
     /// Waiting for the player to pick where the strike goes.
@@ -208,7 +212,7 @@ final class GameScene: SKScene {
         drawBoard()
 
         // Bake every dino's walk cycle now so the first spawn doesn't hitch
-        for kind in [DinoKind.compy, .raptor, .triceratops, .stegosaurus, .rex, .pterodactyl] {
+        for kind in [DinoKind.compy, .raptor, .dilophosaurus, .triceratops, .stegosaurus, .spinosaurus, .rex, .pterodactyl] {
             _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: screenScale)
         }
 
@@ -224,6 +228,7 @@ final class GameScene: SKScene {
         hud.select(tool)
         burns = []
         stats = GameStats()
+        warnedAboutSpit = false
         airstrikeReady = true
         airstrikeArmed = false
         buildAirstrikeButton()
@@ -265,6 +270,7 @@ final class GameScene: SKScene {
         ])))
 
         buildTerrain()
+        rebuildDarkness()
         buildGate()
         buildHelipad()
     }
@@ -440,7 +446,7 @@ final class GameScene: SKScene {
 
     /// Dinos wear a dirt trail into the grass as they run the maze.
     private func addWear(at cell: Cell) {
-        guard cell != grid.spawn, cell != grid.exit else { return }
+        guard cell != grid.spawn, cell != grid.exit, !grid.water.contains(cell) else { return }
         let count = (wear[cell] ?? 0) + 1
         wear[cell] = count
         let patch: SKSpriteNode
@@ -610,12 +616,14 @@ final class GameScene: SKScene {
             hud.flash("Need $\(kind.cost)")
             return
         }
-        let occupied = dinos.filter { !$0.kind.flies }.flatMap { [$0.cell, $0.target] }
+        let walkers = dinos.filter { !$0.kind.flies && !$0.kind.swims }.flatMap { [$0.cell, $0.target] }
+        let swimmers = dinos.filter { $0.kind.swims }.flatMap { [$0.cell, $0.target] }
+        let occupied = walkers + swimmers
         if occupied.contains(cell) {
             hud.flash("Too close to a dino")
             return
         }
-        guard grid.block(cell, keeping: occupied) else {
+        guard grid.block(cell, keeping: walkers, keepingSwimmers: swimmers) else {
             hud.flash("Dinos need a way through!")
             return
         }
@@ -641,6 +649,7 @@ final class GameScene: SKScene {
             showRange(of: tower)
             hud.flash("Tap any tower to upgrade or sell it")
         }
+        rebuildDarkness()
     }
 
     private func upgrade(_ tower: Tower) {
@@ -675,6 +684,7 @@ final class GameScene: SKScene {
         if tower.kind == .fence {
             rebuildWires()
         }
+        rebuildDarkness()
     }
 
     // MARK: - Waves
@@ -725,7 +735,7 @@ final class GameScene: SKScene {
             cellSize: cellSize,
             screenScale: screenScale
         )
-        dino.target = grid.nextStep(from: grid.spawn) ?? grid.spawn
+        dino.target = grid.nextStep(from: grid.spawn, swims: kind.swims) ?? grid.spawn
         dino.position = point(for: grid.spawn)
         // Late waves move a little faster, so a long maze buys less time
         let lateWaveSpeed = 1 + 0.004 * CGFloat(min(max(wavesStarted - 1, 0), 60))
@@ -810,6 +820,7 @@ final class GameScene: SKScene {
             moveShots(dt)
             burnGround(dt)
             sparkFences(dt)
+            spitVenom(dt)
             checkWaveEnd()
         }
     }
@@ -843,7 +854,7 @@ final class GameScene: SKScene {
                     escaped.append(dino)
                     break
                 }
-                guard let next = grid.nextStep(from: dino.cell) else { break }
+                guard let next = grid.nextStep(from: dino.cell, swims: dino.kind.swims) else { break }
                 dino.target = next
             }
 
@@ -910,12 +921,14 @@ final class GameScene: SKScene {
             let total = hypot(flight.end.x - flight.start.x, flight.end.y - flight.start.y)
             return max(0, total - flight.travelled) / cellSize
         }
-        return CGFloat(grid.distance(at: dino.target))
+        return CGFloat(grid.distance(at: dino.target, swims: dino.kind.swims))
     }
 
     private func fireTowers(_ dt: TimeInterval) {
         for tower in towers.values where tower.kind != .fence {
             tower.tickAbility(dt)
+            // Gummed up with venom: no firing until it wears off
+            guard tower.disabledLeft <= 0 else { continue }
             tower.cooldown -= dt
             guard tower.cooldown <= 0 else { continue }
             let reach = tower.range * cellSize
@@ -1132,6 +1145,80 @@ final class GameScene: SKScene {
 
         overlay.alpha = 0
         overlay.run(.sequence([.wait(forDuration: won ? 1.2 : 0), .fadeIn(withDuration: 0.3)]))
+    }
+
+    // MARK: - Dilophosaurus venom
+
+    /// Spitters lob venom at the nearest working tower, gumming it up for 3 seconds.
+    private func spitVenom(_ dt: TimeInterval) {
+        for dino in dinos where dino.kind.spits && !dino.isDead {
+            dino.spitTimer -= dt
+            guard dino.spitTimer <= 0 else { continue }
+            let reach = cellSize * 2
+            let target = towers.values
+                .filter { $0.kind != .fence && $0.disabledLeft <= 0 && distance($0.position, dino.position) <= reach }
+                .min { distance($0.position, dino.position) < distance($1.position, dino.position) }
+            guard let tower = target else {
+                dino.spitTimer = 0.5
+                continue
+            }
+            dino.spitTimer = 4
+            let glob = SKShapeNode(circleOfRadius: cellSize * 0.09)
+            glob.fillColor = SKColor(red: 0.5, green: 0.9, blue: 0.2, alpha: 1)
+            glob.strokeColor = SKColor(red: 0.2, green: 0.45, blue: 0.08, alpha: 1)
+            glob.position = dino.position
+            glob.zPosition = 9
+            world.addChild(glob)
+            glob.run(.sequence([.move(to: tower.position, duration: 0.3), .removeFromParent()])) { [weak self, weak tower] in
+                guard let self, let tower, tower.parent != nil else { return }
+                tower.disable(for: 3)
+                self.puff(at: tower.position, color: UIColor(red: 0.5, green: 0.9, blue: 0.2, alpha: 1))
+                if !self.warnedAboutSpit {
+                    self.warnedAboutSpit = true
+                    self.hud.flash("Dilophosaurus venom! That tower can't fire for 3 seconds")
+                }
+            }
+        }
+    }
+
+    // MARK: - Night
+
+    /// For night parks: darkness over the board with soft pools of light around
+    /// towers, the gate, and the helipad. Redrawn when you build or sell.
+    private func rebuildDarkness() {
+        darkness?.removeFromParent()
+        darkness = nil
+        guard level.night else { return }
+        let boardSize = CGSize(width: cellSize * CGFloat(cols), height: cellSize * CGFloat(rows))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        var lights: [(CGPoint, CGFloat)] = [
+            (point(for: grid.spawn), cellSize * 1.4),
+            (point(for: grid.exit), cellSize * 1.8)
+        ]
+        for tower in towers.values {
+            lights.append((tower.position, cellSize * (tower.kind == .fence ? 0.7 : 1.9)))
+        }
+        let image = UIGraphicsImageRenderer(size: boardSize, format: format).image { context in
+            let ctx = context.cgContext
+            ctx.setFillColor(UIColor(red: 0.01, green: 0.02, blue: 0.04, alpha: 0.82).cgColor)
+            ctx.fill(CGRect(origin: .zero, size: boardSize))
+            ctx.setBlendMode(.destinationOut)
+            let colors = [UIColor.black.cgColor, UIColor.black.withAlphaComponent(0).cgColor] as CFArray
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0.35, 1]) else { return }
+            for (spot, radius) in lights {
+                // Image space runs top down; the board runs bottom up
+                let center = CGPoint(x: spot.x - origin.x, y: boardSize.height - (spot.y - origin.y))
+                ctx.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: radius, options: [])
+            }
+        }
+        let overlay = SKSpriteNode(texture: SKTexture(image: image), size: boardSize)
+        overlay.anchorPoint = .zero
+        overlay.position = origin
+        overlay.zPosition = 8.8
+        world.addChild(overlay)
+        darkness = overlay
     }
 
     // MARK: - Air strike

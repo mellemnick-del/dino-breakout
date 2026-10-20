@@ -1,7 +1,7 @@
 import SpriteKit
 
 enum DinoKind {
-    case compy, raptor, triceratops, stegosaurus, rex, pterodactyl
+    case compy, raptor, dilophosaurus, triceratops, stegosaurus, spinosaurus, rex, pterodactyl
 
     var name: String {
         switch self {
@@ -9,6 +9,8 @@ enum DinoKind {
         case .raptor: "Raptor"
         case .triceratops: "Triceratops"
         case .stegosaurus: "Stegosaurus"
+        case .dilophosaurus: "Dilophosaurus"
+        case .spinosaurus: "Spinosaurus"
         case .rex: "T-Rex"
         case .pterodactyl: "Pterodactyl"
         }
@@ -17,6 +19,16 @@ enum DinoKind {
     /// Flyers go straight over the maze and can't be reached by flares.
     var flies: Bool {
         self == .pterodactyl
+    }
+
+    /// Swimmers cut straight across rivers.
+    var swims: Bool {
+        self == .spinosaurus
+    }
+
+    /// Spitters disable towers for a moment.
+    var spits: Bool {
+        self == .dilophosaurus
     }
 
     /// Flat damage soaked from every hit. Weak, fast shots barely scratch armor.
@@ -30,6 +42,8 @@ enum DinoKind {
         case .raptor: "raptors"
         case .triceratops: "triceratops"
         case .stegosaurus: "stegosaurs"
+        case .dilophosaurus: "dilophosaurs"
+        case .spinosaurus: "spinosaurs"
         case .rex: "T-Rex"
         case .pterodactyl: "pterodactyls"
         }
@@ -41,6 +55,8 @@ enum DinoKind {
         case .raptor: 40
         case .triceratops: 200
         case .stegosaurus: 160
+        case .dilophosaurus: 70
+        case .spinosaurus: 400
         case .rex: 1300
         case .pterodactyl: 40
         }
@@ -53,6 +69,8 @@ enum DinoKind {
         case .raptor: 2.5
         case .triceratops: 0.85
         case .stegosaurus: 0.75
+        case .dilophosaurus: 1.4
+        case .spinosaurus: 0.9
         case .rex: 0.6
         case .pterodactyl: 1.3
         }
@@ -65,6 +83,8 @@ enum DinoKind {
         case .raptor: 4
         case .triceratops: 12
         case .stegosaurus: 11
+        case .dilophosaurus: 7
+        case .spinosaurus: 20
         case .rex: 80
         case .pterodactyl: 5
         }
@@ -77,6 +97,8 @@ enum DinoKind {
         case .raptor: 1
         case .triceratops: 2
         case .stegosaurus: 2
+        case .dilophosaurus: 1
+        case .spinosaurus: 3
         case .rex: 10
         case .pterodactyl: 1
         }
@@ -104,6 +126,8 @@ final class Dino: SKNode {
     var flight: Flight?
 
     private var slowFactor: CGFloat = 1
+    /// Seconds until a spitter can spit again.
+    var spitTimer: TimeInterval = 2
     /// Daily challenge speed boost.
     var speedScale: CGFloat = 1
     private var slowTimeLeft: TimeInterval = 0

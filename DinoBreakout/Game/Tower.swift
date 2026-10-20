@@ -143,6 +143,9 @@ final class Tower: SKNode {
     var targeting: Targeting = .first
     /// Seconds until the special ability is ready again.
     var abilityCooldown: TimeInterval = 0
+    /// Seconds this tower is gummed up by venom and can't fire.
+    private(set) var disabledLeft: TimeInterval = 0
+    private var goo: SKNode?
     /// Seconds of turret overdrive left.
     private(set) var overdriveLeft: TimeInterval = 0
     private var overdriveGlow: SKShapeNode?
@@ -212,12 +215,40 @@ final class Tower: SKNode {
     /// Counts down the ability recharge and any overdrive.
     func tickAbility(_ dt: TimeInterval) {
         abilityCooldown = max(0, abilityCooldown - dt)
+        if disabledLeft > 0 {
+            disabledLeft -= dt
+            if disabledLeft <= 0 {
+                goo?.run(.sequence([.fadeOut(withDuration: 0.2), .removeFromParent()]))
+                goo = nil
+            }
+        }
         guard overdriveLeft > 0 else { return }
         overdriveLeft -= dt
         if overdriveLeft <= 0 {
             overdriveGlow?.removeFromParent()
             overdriveGlow = nil
         }
+    }
+
+    /// Venom: the tower can't fire for a few seconds.
+    func disable(for duration: TimeInterval) {
+        disabledLeft = max(disabledLeft, duration)
+        guard goo == nil else { return }
+        let blob = SKNode()
+        blob.zPosition = 2
+        for i in 0..<5 {
+            let drop = SKShapeNode(circleOfRadius: cellSize * (0.12 + 0.05 * CGFloat(i % 3)))
+            drop.fillColor = SKColor(red: 0.45, green: 0.85, blue: 0.2, alpha: 0.8)
+            drop.strokeColor = SKColor(red: 0.2, green: 0.45, blue: 0.08, alpha: 1)
+            drop.lineWidth = 1.5
+            let a = CGFloat(i) * 1.3
+            drop.position = CGPoint(x: cos(a) * cellSize * 0.16, y: sin(a) * cellSize * 0.16)
+            blob.addChild(drop)
+        }
+        blob.setScale(0.3)
+        blob.run(.scale(to: 1, duration: 0.15))
+        addChild(blob)
+        goo = blob
     }
 
     func startOverdrive(for duration: TimeInterval) {

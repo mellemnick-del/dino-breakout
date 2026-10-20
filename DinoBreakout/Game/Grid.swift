@@ -19,21 +19,30 @@ final class Grid {
     let exit: Cell
     /// Boulders and water: always blocked, never buildable.
     let terrain: Set<Cell>
+    /// River squares. Swimmers can cross them; nothing else can.
+    let water: Set<Cell>
     private(set) var blocked: Set<Cell> = []
     private var field: [Int] = []
+    /// The same distance map, but with the river open.
+    private var swimField: [Int] = []
 
-    init(cols: Int, rows: Int, spawn: Cell, exit: Cell, terrain: Set<Cell> = []) {
+    init(cols: Int, rows: Int, spawn: Cell, exit: Cell, terrain: Set<Cell> = [], water: Set<Cell> = []) {
         self.cols = cols
         self.rows = rows
         self.spawn = spawn
         self.exit = exit
         self.terrain = terrain
+        self.water = water
         blocked = terrain
         field = buildField(blocked: blocked)
+        swimField = buildField(blocked: blocked.subtracting(water))
     }
 
     convenience init(level: Level) {
-        self.init(cols: Level.cols, rows: Level.rows, spawn: level.spawn, exit: level.exit, terrain: level.terrain)
+        self.init(
+            cols: Level.cols, rows: Level.rows, spawn: level.spawn, exit: level.exit,
+            terrain: level.terrain, water: Set(level.water)
+        )
     }
 
     func contains(_ cell: Cell) -> Bool {
@@ -41,21 +50,22 @@ final class Grid {
     }
 
     /// Steps from this cell to the helipad.
-    func distance(at cell: Cell) -> Int {
-        contains(cell) ? field[index(cell)] : Grid.unreachable
+    func distance(at cell: Cell, swims: Bool = false) -> Int {
+        guard contains(cell) else { return Grid.unreachable }
+        return swims ? swimField[index(cell)] : field[index(cell)]
     }
 
     /// The neighbor one step closer to the helipad, or nil when already there.
-    func nextStep(from cell: Cell) -> Cell? {
-        let here = distance(at: cell)
+    func nextStep(from cell: Cell, swims: Bool = false) -> Cell? {
+        let here = distance(at: cell, swims: swims)
         guard here != Grid.unreachable, here > 0 else { return nil }
-        return neighbors(of: cell).min { distance(at: $0) < distance(at: $1) }
+        return neighbors(of: cell).min { distance(at: $0, swims: swims) < distance(at: $1, swims: swims) }
     }
 
     /// Builds on a cell unless that would seal off the paddock gate or any cell
     /// in `mustStayOpen` (where dinos are standing or heading). Returns false and
     /// changes nothing if the build isn't allowed.
-    func block(_ cell: Cell, keeping mustStayOpen: [Cell]) -> Bool {
+    func block(_ cell: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
         guard contains(cell), cell != spawn, cell != exit, !blocked.contains(cell) else { return false }
         var trial = blocked
         trial.insert(cell)
@@ -63,14 +73,20 @@ final class Grid {
         for open in [spawn] + mustStayOpen where trialField[index(open)] == Grid.unreachable {
             return false
         }
+        let trialSwim = buildField(blocked: trial.subtracting(water))
+        for open in swimmers where trialSwim[index(open)] == Grid.unreachable {
+            return false
+        }
         blocked = trial
         field = trialField
+        swimField = trialSwim
         return true
     }
 
     func unblock(_ cell: Cell) {
         guard !terrain.contains(cell), blocked.remove(cell) != nil else { return }
         field = buildField(blocked: blocked)
+        swimField = buildField(blocked: blocked.subtracting(water))
     }
 
     // MARK: - Private

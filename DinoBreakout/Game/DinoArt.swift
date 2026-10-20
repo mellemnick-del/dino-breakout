@@ -36,10 +36,11 @@ struct DinoStyle {
         case theropod(length: CGFloat, widths: [CGFloat], teeth: Int, brow: Bool)
         case trike(length: CGFloat)
         case ptero(length: CGFloat)
+        case dilo(length: CGFloat)
     }
 
     enum Marks {
-        case spots, stripes, ridge, blotches, plain, plates
+        case spots, stripes, ridge, blotches, plain, plates, sail
     }
 
     let skin: UIColor
@@ -74,6 +75,7 @@ struct DinoStyle {
         case .theropod(let length, _, _, _): length
         case .trike(let length): length
         case .ptero(let length): length
+        case .dilo(let length): length
         }
     }
 
@@ -149,6 +151,32 @@ extension DinoKind {
                 arms: [],
                 head: .theropod(length: 16, widths: [10, 11, 10, 8, 5], teeth: 0, brow: false),
                 marks: .plates, cells: 1.5
+            )
+        case .dilophosaurus:
+            DinoStyle(
+                skin: UIColor(hex: 0x9AA83C), light: UIColor(hex: 0xCAD46A), dark: UIColor(hex: 0x4D5A1A), eye: UIColor(hex: 0xE04A2A),
+                spine: [(0, 10), (-6, 16), (-16, 21), (-26, 21), (-34, 16), (-44, 10), (-56, 6), (-68, 4), (-80, 2), (-88, 1)],
+                hip: 30, sway: 1.5, wag: 4, wave: 0.05, stride: 7, rate: 1.5,
+                legs: [
+                    DinoLeg(x: -26, side: 1, spread: 13, rx: 10, ry: 6, off: 0),
+                    DinoLeg(x: -26, side: -1, spread: 13, rx: 10, ry: 6, off: .pi)
+                ],
+                arms: [DinoArm(x: -6, spread: 10, rx: 4.5, ry: 2.4)],
+                head: .dilo(length: 26),
+                marks: .spots, cells: 1.1
+            )
+        case .spinosaurus:
+            DinoStyle(
+                skin: UIColor(hex: 0x3F6E6A), light: UIColor(hex: 0x6E9E96), dark: UIColor(hex: 0x24403D), eye: UIColor(hex: 0xF2B92A),
+                spine: [(0, 16), (-10, 26), (-24, 34), (-38, 36), (-52, 30), (-64, 22), (-78, 14), (-92, 8), (-106, 3), (-116, 1)],
+                hip: 50, sway: 2, wag: 7, wave: 0.04, stride: 8, rate: 0.9,
+                legs: [
+                    DinoLeg(x: -42, side: 1, spread: 20, rx: 14, ry: 9, off: 0),
+                    DinoLeg(x: -42, side: -1, spread: 20, rx: 14, ry: 9, off: .pi)
+                ],
+                arms: [DinoArm(x: -12, spread: 18, rx: 6, ry: 3)],
+                head: .theropod(length: 44, widths: [16, 17, 13, 10, 7], teeth: 6, brow: false),
+                marks: .sail, cells: 1.9
             )
         case .rex:
             DinoStyle(
@@ -391,6 +419,8 @@ enum DinoArt {
             drawTrikeHead(style, length: length, in: ctx)
         case .ptero(let length):
             drawPteroHead(style, length: length, lineWidth: lw, in: ctx)
+        case .dilo(let length):
+            drawDiloHead(style, length: length, lineWidth: lw, in: ctx)
         }
         ctx.restoreGState()
     }
@@ -443,6 +473,23 @@ enum DinoArt {
             }
         case .plain:
             break
+        case .sail:
+            // The tall back sail, seen from above as a red fin down the spine
+            let sailPoints = (1...min(6, pts.count - 1)).map { pts[$0] }.reversed().map {
+                SpinePoint(x: $0.x, y: $0.y, w: max(3, $0.w * 0.24))
+            }
+            ribbon(ctx, Array(sailPoints))
+            paint(ctx, UIColor(hex: 0xB8433A))
+            ctx.setStrokeColor(UIColor(hex: 0x6E1F18).cgColor)
+            ctx.setLineWidth(lw)
+            for i in 1...min(6, pts.count - 1) {
+                let f = frameAt(pts, i)
+                let half = max(1.5, f.p.w * 0.11)
+                ctx.move(to: CGPoint(x: f.p.x + f.nx * half, y: f.p.y + f.ny * half))
+                ctx.addLine(to: CGPoint(x: f.p.x - f.nx * half, y: f.p.y - f.ny * half))
+            }
+            ctx.strokePath()
+            ctx.setStrokeColor(outline.cgColor)
         case .plates:
             // Two staggered rows of back plates, then the spiked tail
             let plate = UIColor(hex: 0xC9603A)
@@ -632,6 +679,47 @@ enum DinoArt {
             fill(ctx, style.eye)
             ellipse(ctx, L * 0.24, side * 3.4, 0.35, 0.8)
             fill(ctx, outline)
+        }
+    }
+
+    private static func drawDiloHead(_ style: DinoStyle, length L: CGFloat, lineWidth lw: CGFloat, in ctx: CGContext) {
+        // Neck frill fanned out behind the head
+        let rays = 9
+        ctx.move(to: CGPoint(x: L * 0.15, y: 0))
+        for i in 0...rays {
+            let a = -CGFloat.pi * 0.85 + CGFloat(i) / CGFloat(rays) * CGFloat.pi * 1.7
+            let r: CGFloat = i % 2 == 0 ? 22 : 18
+            ctx.addLine(to: CGPoint(x: L * 0.05 + cos(a + .pi) * r * 0.55, y: sin(a + .pi) * r))
+        }
+        ctx.closePath()
+        paint(ctx, UIColor(hex: 0xE0782A))
+        ctx.move(to: CGPoint(x: L * 0.12, y: 0))
+        for i in 0...rays {
+            let a = -CGFloat.pi * 0.85 + CGFloat(i) / CGFloat(rays) * CGFloat.pi * 1.7
+            ctx.addLine(to: CGPoint(x: L * 0.08 + cos(a + .pi) * 7, y: sin(a + .pi) * 13))
+        }
+        ctx.closePath()
+        fill(ctx, UIColor(hex: 0xF2C94C))
+
+        let hp = headProfile(L, [11, 13, 11, 8, 5])
+        drawHeadShape(style, hp, in: ctx)
+
+        // Twin crests along the top of the head
+        for side: CGFloat in [1, -1] {
+            ctx.move(to: CGPoint(x: L * 0.25, y: side * 2.6))
+            ctx.addQuadCurve(to: CGPoint(x: L * 0.9, y: side * 1.6), control: CGPoint(x: L * 0.55, y: side * 4.2))
+            ctx.setStrokeColor(UIColor(hex: 0xC0392B).cgColor)
+            ctx.setLineWidth(lw * 1.8)
+            ctx.strokePath()
+        }
+        ctx.setStrokeColor(outline.cgColor)
+        ctx.setLineWidth(lw)
+
+        for side: CGFloat in [1, -1] {
+            ellipse(ctx, L * 0.3, side * 4.3, 2, 1.8)
+            paint(ctx, eyeWhite)
+            ellipse(ctx, L * 0.31, side * 4.3, 1.1, 1.1)
+            fill(ctx, style.eye)
         }
     }
 

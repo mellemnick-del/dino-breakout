@@ -13,7 +13,7 @@ A mazing tower defense game for iPhone. The park's power has failed and the dino
 The game opens on a title screen with dinos roaming the park behind it.
 
 - **Difficulty:** Easy (30 lives, $150), Medium (20 lives, $100), or Hard (10 lives, $80, tougher dinos, smaller bounties).
-- **Parks**, in unlock order: Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), Jungle River (a river with two bridges), Visitor Center (buildings to maze around), The Aviary (pterodactyls from wave 3), and Mount Ember (lava pools on volcanic ash). Each park unlocks when you reach wave 10 on the one before it, on any difficulty.
+- **Parks**, in unlock order: Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), Jungle River (a river with two bridges), Visitor Center (buildings to maze around), The Aviary (pterodactyls from wave 3), and Night Shift (dark except where your towers light it up), Mount Ember (lava pools on volcanic ash). Each park unlocks when you reach wave 10 on the one before it, on any difficulty.
 - **Daily challenge:** the card at the top of the menu. Every date picks a park, difficulty, and twist (Sky Swarm, No Fences, Rich but Stingy, Fast Dinos, Five Lives, or Armored Up), the same on every device. Survive 20 waves to complete it.
 - **Achievements** (trophy button): 14 to earn, from First Bite to Never Off (wave 75 in endless). A banner pops up in game when you earn one.
 - **Test mode:** tap the big DINO title 7 times. Every park and endless mode unlock, you start with $9,999, and nothing counts toward stars, records, or achievements. Tap 7 more times to turn it off.
@@ -61,6 +61,8 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 | Triceratops | Slow and very tough, costs 2 lives if it gets through |
 | T-Rex | Boss. Shakes the screen on arrival, costs 10 lives |
 | Stegosaurus | Armored: every hit loses 5 damage (always at least 1 gets through), so weak, fast shots barely scratch it. Upgrade your towers. Joins mixed waves from 13 and triceratops columns from 14 |
+| Dilophosaurus | Yellow-green with a fanned orange frill and red crests. Every 4 seconds it spits venom at the nearest tower within 2 squares, which can't fire for 3 seconds. From wave 19 |
+| Spinosaurus | Teal with a red back sail, 400 health. It swims, so on Jungle River it cuts straight across the river instead of using the bridges. From wave 17 |
 | Pterodactyl | Flies straight over the maze from the gate to the chopper, weaving as it goes. Flak hits it at full damage; turrets and tranqs only do half, and flares can't reach it. First flock on wave 11, then every third wave, a big flock on boss waves, and a few on most waves from 30 on |
 
 The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed.
