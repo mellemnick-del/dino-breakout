@@ -58,6 +58,8 @@ final class SoundBank {
     private var musicBuffer: AVAudioPCMBuffer?
     private var lastPlayed: [Sound: TimeInterval] = [:]
     private var started = false
+    /// Sounds are synthesized and the engine is running.
+    private var ready = false
 
     private init() {
         let defaults = UserDefaults.standard
@@ -72,15 +74,30 @@ final class SoundBank {
     func start() {
         guard !started else { return }
         started = true
-        // Ambient: mixes with the player's own music and respects the silent switch
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
-        try? AVAudioSession.sharedInstance().setActive(true)
+        // Touch the lazy format here on the main thread before the background work reads it
+        _ = format
+        // Activating the audio session and synthesizing every sound takes a moment,
+        // so it happens off the main thread and the menu appears right away
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            // Ambient: mixes with the player's own music and respects the silent switch
+            try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default)
+            try? AVAudioSession.sharedInstance().setActive(true)
 
-        for sound in Sound.allCases {
-            buffers[sound] = make(sound)
+            var made: [Sound: AVAudioPCMBuffer] = [:]
+            for sound in Sound.allCases {
+                made[sound] = make(sound)
+            }
+            let loop = makeMusic()
+
+            DispatchQueue.main.async {
+                buffers = made
+                musicBuffer = loop
+                startEngine()
+            }
         }
-        musicBuffer = makeMusic()
+    }
 
+    private func startEngine() {
         engine.attach(music)
         engine.connect(music, to: engine.mainMixerNode, format: format)
         for _ in 0..<10 {
@@ -95,6 +112,7 @@ final class SoundBank {
         } catch {
             return
         }
+        ready = true
         music.volume = musicVolume * 0.6
         if let musicBuffer {
             music.scheduleBuffer(musicBuffer, at: nil, options: .loops)
@@ -103,7 +121,7 @@ final class SoundBank {
     }
 
     func play(_ sound: Sound, volume: Float = 1) {
-        guard started, engine.isRunning, effectsVolume > 0, let buffer = buffers[sound] else { return }
+        guard ready, engine.isRunning, effectsVolume > 0, let buffer = buffers[sound] else { return }
         let now = ProcessInfo.processInfo.systemUptime
         if let last = lastPlayed[sound], now - last < sound.minGap { return }
         lastPlayed[sound] = now
