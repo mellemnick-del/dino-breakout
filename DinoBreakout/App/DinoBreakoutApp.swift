@@ -47,6 +47,7 @@ struct RootView: View {
         .onAppear {
             SoundBank.shared.start()
             GameCenter.signIn()
+            RewardedAds.shared.start()
         }
     }
 }

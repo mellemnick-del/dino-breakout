@@ -123,6 +123,18 @@ final class GameScene: SKScene {
     private var darkness: SKSpriteNode?
     /// Whether this game has explained venom yet.
     private var warnedAboutSpit = false
+    /// Optional ad rewards: one revive per game, bonus cash every 5 waves.
+    private var revivedThisGame = false
+    private var lastAdBonusWave = -99
+
+    /// Cash for watching an optional ad from the pause menu.
+    private var adBonusCash: Int {
+        40 + 8 * max(1, wavesStarted)
+    }
+
+    private var canWatchForCash: Bool {
+        RewardedAds.shared.isAvailable && challenge == nil && wavesStarted - lastAdBonusWave >= 5
+    }
     /// One chopper strafing run per wave.
     private var airstrikeReady = true
     /// Waiting for the player to pick where the strike goes.
@@ -229,6 +241,8 @@ final class GameScene: SKScene {
         burns = []
         stats = GameStats()
         warnedAboutSpit = false
+        revivedThisGame = false
+        lastAdBonusWave = -99
         airstrikeReady = true
         airstrikeArmed = false
         buildAirstrikeButton()
@@ -493,6 +507,12 @@ final class GameScene: SKScene {
             let hits = overlay.nodes(at: touch.location(in: overlay)).compactMap { $0.name }
             if hits.contains("endless") {
                 keepGoing()
+            } else if hits.contains("revive") {
+                RewardedAds.shared.show { [weak self] in
+                    self?.revive()
+                } onUnavailable: { [weak overlay] in
+                    (overlay?.childNode(withName: "//reviveLabel") as? SKLabelNode)?.text = "No ad ready, try again"
+                }
             } else if hits.contains("restart") {
                 startNewGame()
             } else if hits.contains("menu") {
@@ -508,6 +528,18 @@ final class GameScene: SKScene {
                 closePauseMenu()
             } else if hits.contains("menu") {
                 onExit?()
+            } else if hits.contains("adcash"), canWatchForCash {
+                let bonus = adBonusCash
+                RewardedAds.shared.show { [weak self] in
+                    guard let self else { return }
+                    self.cash += bonus
+                    self.lastAdBonusWave = self.wavesStarted
+                    Haptics.success()
+                    self.closePauseMenu()
+                    self.hud.flash("Thanks for watching! +$\(bonus)")
+                } onUnavailable: { [weak menu] in
+                    (menu?.childNode(withName: "//adcashLabel") as? SKLabelNode)?.text = "No ad ready, try again"
+                }
             }
             return
         }
@@ -1134,8 +1166,16 @@ final class GameScene: SKScene {
             overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
             overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -200))
         } else {
-            overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80))
-            overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
+            if RewardedAds.shared.isAvailable && !revivedThisGame && challenge == nil {
+                let revive = menuButton("▶ Watch an ad to revive", name: "revive", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80)
+                revive.children.first?.name = "reviveLabel"
+                overlay.addChild(revive)
+                overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
+                overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -200))
+            } else {
+                overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80))
+                overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
+            }
         }
         gameOverOverlay = overlay
         SoundBank.shared.play(won ? .win : .lose)
@@ -1469,6 +1509,29 @@ final class GameScene: SKScene {
         ]))
     }
 
+    /// Ad revive: back in the fight with 5 lives, and the dinos on the board cleared.
+    private func revive() {
+        gameOverOverlay?.removeFromParent()
+        gameOverOverlay = nil
+        revivedThisGame = true
+        isOver = false
+        for dino in dinos {
+            dino.run(.sequence([.fadeOut(withDuration: 0.25), .removeFromParent()]))
+        }
+        dinos.removeAll()
+        for shot in shots {
+            shot.node.removeFromParent()
+        }
+        shots.removeAll()
+        lives = 5
+        Haptics.success()
+        SoundBank.shared.play(.upgrade)
+        hud.flash("Revived! 5 lives. Hold the line")
+        if !waveActive {
+            hud.setSendEnabled(true)
+        }
+    }
+
     /// After winning, bring the chopper back down and keep the waves coming.
     private func keepGoing() {
         gameOverOverlay?.removeFromParent()
@@ -1626,8 +1689,15 @@ final class GameScene: SKScene {
         menu.addChild(menuButton("Restart", name: "restart", fill: Palette.panel, text: Palette.danger, outlined: true, y: -50))
         menu.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -110))
 
+        var noteY: CGFloat = -156
+        if canWatchForCash {
+            let adButton = menuButton("▶ Watch an ad: +$\(adBonusCash)", name: "adcash", fill: Palette.panel, text: Palette.warning, outlined: true, y: -170)
+            adButton.children.first?.name = "adcashLabel"
+            menu.addChild(adButton)
+            noteY = -216
+        }
         let note = makeLabel("Restart and Main Menu end this run", size: 13, color: Palette.muted)
-        note.position = CGPoint(x: 0, y: -156)
+        note.position = CGPoint(x: 0, y: noteY)
         menu.addChild(note)
     }
 

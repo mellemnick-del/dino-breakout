@@ -33,7 +33,24 @@ App Store Connect needs a public **Support URL** and **Privacy Policy URL**. The
    - Privacy: `https://mellemnick-del.github.io/dino-breakout-site/privacy.html`
    - Marketing (optional): `https://mellemnick-del.github.io/dino-breakout-site/`
 
-## 4. Create the app in App Store Connect
+## 4. Optional rewarded ads (Google AdMob)
+
+The ad code is already in the game (`RewardedAds.swift`), but it stays switched off until these steps are done. Without them the game builds and plays fine with no ad buttons.
+
+1. Sign up at **admob.google.com** with a Google account and add your payment and tax info.
+2. Apps, **Add app**: iOS, "Is the app listed on a supported app store?" No for now (link it after launch).
+3. Note the **App ID** (looks like `ca-app-pub-1234567890123456~1234567890`).
+4. In that app, Ad units, **Add ad unit**, **Rewarded**. Name it "Revive and bonus". Note the **ad unit ID** (looks like `ca-app-pub-1234567890123456/1234567890`).
+5. In AdMob, app settings: set **Max ad content rating** to **PG**.
+6. In AdMob, Privacy & messaging: create a **GDPR message** (EU and UK consent) and publish it. The game shows it automatically where it's required.
+7. In Xcode: File, **Add Package Dependencies**, paste `https://github.com/googleads/swift-package-manager-google-mobile-ads`, Add Package, and add **GoogleMobileAds** to the DinoBreakout target.
+8. Paste your ad unit ID into `releaseUnitID` in `DinoBreakout/Game/RewardedAds.swift`.
+9. Your App ID goes in the **Release** build setting `ADMOB_APP_ID` (target, Build Settings, search "ADMOB"). Leave Debug on Google's test ID.
+10. Run from Xcode: Debug builds show Google's **test ads**, so you can tap them freely. Never tap your own real ads; Google can ban the account.
+
+Where ads appear: a **Watch an ad to revive** button when you lose (once per game, not in daily challenges), and **Watch an ad: +$** in the pause menu (once every 5 waves). Nothing else.
+
+## 5. Create the app in App Store Connect
 
 appstoreconnect.apple.com, Apps, +, New App:
 
@@ -44,9 +61,9 @@ appstoreconnect.apple.com, Apps, +, New App:
 - SKU: `dinobreakout`
 - User access: Full Access
 
-Then fill in everything from `docs/AppStoreListing.md`: subtitle, promotional text, description, keywords, support and privacy URLs, category (Games > Strategy), age rating questionnaire, and App Privacy (**Data Not Collected**).
+Then fill in everything from `docs/AppStoreListing.md`: subtitle, promotional text, description, keywords, support and privacy URLs, category (Games > Strategy), age rating questionnaire, and App Privacy (the AdMob answers in that doc).
 
-## 5. Game Center leaderboards
+## 6. Game Center leaderboards
 
 In the app's page in App Store Connect: Services (or Features), Game Center, then create **Classic leaderboards**, score format **Integer**, sort **High to Low**, with these IDs:
 
@@ -63,7 +80,7 @@ In the app's page in App Store Connect: Services (or Features), Game Center, the
 
 Then add Game Center to the version you're submitting (in the version page, Game Center section, add the leaderboards).
 
-## 6. Upload a build
+## 7. Upload a build
 
 1. In Xcode, set the run destination to **Any iOS Device (arm64)**.
 2. Product, **Archive**.
@@ -72,22 +89,22 @@ Then add Game Center to the version you're submitting (in the version page, Game
 
 For every later upload, raise the **Build** number first (target, General tab), or the upload is rejected.
 
-## 7. TestFlight
+## 8. TestFlight
 
 1. TestFlight tab, Internal Testing, +, create a group, add yourself.
 2. To add family: **Users and Access**, invite them with the role **Customer Support** (or any role), then add them to the internal group. Internal builds need no review.
 3. Testers install the free **TestFlight** app and accept the email invite.
 4. Play through the tutorial, a few parks, endless mode, and the daily challenge on a real device before submitting.
 
-## 8. Screenshots
+## 9. Screenshots
 
 At least the **6.9 inch** size (1320 x 2868). In Xcode, run on an **iPhone Pro Max** simulator and press **Cmd + S** to save a screenshot to the desktop. The suggested six shots and captions are in `docs/AppStoreListing.md`. Running from Xcode means test mode is available to set up scenes fast; it won't exist in the submitted build.
 
-## 9. Submit
+## 10. Submit
 
 1. On the 1.0 version page: pick the build, add screenshots, fill **App Review Information**:
    - Sign-in required: **No**
-   - Notes: "No account or login. All content is playable offline. Parks unlock by reaching wave 10 on the previous park."
+   - Notes: "No account or login. All content is playable offline. Parks unlock by reaching wave 10 on the previous park. Ads are optional rewarded ads only: lose a game to see the revive offer, or open the pause menu after wave 5 for bonus cash."
 2. Version release: **Manually release this version** is safest for a first launch.
 3. **Add for Review**, then **Submit**.
 

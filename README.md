@@ -36,6 +36,7 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 - **Interest:** clearing a wave pays 5% interest on the cash you saved, up to $50.
 - **Stats:** the game over screen shows dinos taken down, your MVP tower's share of the damage, and time played.
 - **Tutorial:** the first game on Paddock B walks you through fences, a turret, a wave, and an upgrade. Replay it from Settings.
+- **Optional ads:** after losing, "Watch an ad to revive" brings you back with 5 lives (once per game), and the pause menu offers bonus cash for an ad every 5 waves. Off until the AdMob package and IDs are added; see `docs/ReleaseChecklist.md`.
 - **Vibration:** taps when you build, a punch on upgrades and abilities, a stomp when a T-Rex arrives. Turn it off in Settings.
 - Tap **Send Wave** when your maze is ready. Clearing a wave pays a bonus.
 - While a wave is running, the same button is the speed toggle: 1x, 2x, 3x.

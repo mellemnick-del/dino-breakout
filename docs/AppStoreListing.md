@@ -42,7 +42,8 @@ PLAY YOUR WAY
 - Call in an air strike when things get desperate
 - Speed up to 3x
 - 14 achievements
-- No ads, no account, plays offline
+- No forced ads: watch one only if you want a revive or bonus cash
+- No account needed, plays offline
 
 ## Keywords (100 max, comma separated, no spaces needed)
 
@@ -55,11 +56,18 @@ dinosaur,dino,td,maze,strategy,raptor,trex,defense,offline,park,pterodactyl,surv
 
 ## Age rating
 
-Answer the questionnaire with **Infrequent/Mild Cartoon or Fantasy Violence** and **None** for everything else. That should come out at **9+**.
+Answer the questionnaire with **Infrequent/Mild Cartoon or Fantasy Violence** and **None** for everything else. That should come out at **9+**. In AdMob, set the app's maximum ad content rating to **PG** so ads match.
 
 ## App privacy
 
-**Data Not Collected.** The game stores progress, settings, and records only on the device. (If Game Center is turned on later, that's Apple's service and doesn't change this answer.)
+The game itself collects nothing, but the optional rewarded ads come from Google AdMob, which does. Answer the App Privacy questions using Google's current guide ("Google Mobile Ads SDK: Apple App Store data disclosure", on developers.google.com/admob). At the time of writing that means declaring, for **Third-Party Advertising** and **Analytics**:
+
+- **Identifiers:** Device ID (used for tracking only if the player allows it in the iOS prompt)
+- **Location:** Coarse Location
+- **Usage Data:** Product Interaction, Advertising Data
+- **Diagnostics:** Crash Data, Performance Data, Other Diagnostic Data
+
+Game Center is Apple's service and doesn't change these answers.
 
 ## Also required
 
