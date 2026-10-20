@@ -89,7 +89,7 @@ final class SoundBank {
             }
             let loop = makeMusic()
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [self] in
                 buffers = made
                 musicBuffer = loop
                 startEngine()
