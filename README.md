@@ -31,12 +31,12 @@ A mazing tower defense game for iPhone. The park's power has failed and the dino
 
 | Dino | Notes |
 | --- | --- |
-| 🦎 Compy | Weak but fast, comes in swarms |
-| 🦖 Raptor | The fastest thing in the park |
-| 🦕 Triceratops | Slow and very tough, costs 2 lives if it gets through |
-| 🦖 T-Rex | Boss. Shakes the screen on arrival, costs 10 lives |
+| Compy | Weak but fast, comes in swarms |
+| Raptor | The fastest thing in the park |
+| Triceratops | Slow and very tough, costs 2 lives if it gets through |
+| T-Rex | Boss. Shakes the screen on arrival, costs 10 lives |
 
-Emoji are placeholder art so we can tune gameplay before drawing sprites.
+The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed. Towers, fences, and the ground are still placeholder art.
 
 ## Run it on your Mac
 
@@ -61,7 +61,8 @@ DinoBreakout/
   Game/
     GameScene.swift   Game loop, input, waves, combat, effects
     Grid.swift        The map and the pathfinding distance field
-    Dino.swift        Dino types and stats
+    Dino.swift        Dino types, stats, and the dino node
+    DinoArt.swift     Dino colors and shapes, and the walk cycle renderer
     Tower.swift       Build pieces, stats, and upgrades
     Waves.swift       The 10 waves and difficulty scaling
     HUD.swift         Top bar, build bar, colors, fonts
@@ -75,6 +76,7 @@ DinoBreakout/
 
 All the numbers live in a few obvious places:
 - Dino health, speed, reward, and lives cost: `DinoKind` in `Dino.swift`
+- Dino colors, proportions, and walk speed: `DinoKind.style` in `DinoArt.swift`
 - Tower cost, range, fire rate, damage: `BuildKind` in `Tower.swift`
 - Upgrade scaling and sell value: `Tower` in `Tower.swift`
 - Wave lineups and health scaling per wave: `Waves.swift`

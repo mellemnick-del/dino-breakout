@@ -11,43 +11,45 @@ struct SpawnGroup {
 
 enum Waves {
     static let all: [[SpawnGroup]] = [
-        [SpawnGroup(kind: .compy, count: 10, every: 0.9)],
-        [SpawnGroup(kind: .compy, count: 16, every: 0.6)],
+        [SpawnGroup(kind: .compy, count: 12, every: 0.8)],
+        [SpawnGroup(kind: .compy, count: 20, every: 0.5)],
         [
-            SpawnGroup(kind: .compy, count: 10, every: 0.6),
-            SpawnGroup(kind: .raptor, count: 4, every: 1.2, startAt: 7)
+            SpawnGroup(kind: .compy, count: 14, every: 0.5),
+            SpawnGroup(kind: .raptor, count: 6, every: 1.0, startAt: 6)
         ],
-        [SpawnGroup(kind: .raptor, count: 10, every: 0.9)],
+        [SpawnGroup(kind: .raptor, count: 14, every: 0.75)],
         [
-            SpawnGroup(kind: .triceratops, count: 3, every: 3),
-            SpawnGroup(kind: .compy, count: 12, every: 0.5, startAt: 2)
-        ],
-        [
-            SpawnGroup(kind: .raptor, count: 12, every: 0.7),
-            SpawnGroup(kind: .compy, count: 10, every: 0.4, startAt: 4)
+            SpawnGroup(kind: .triceratops, count: 4, every: 2.5),
+            SpawnGroup(kind: .compy, count: 18, every: 0.4, startAt: 2)
         ],
         [
-            SpawnGroup(kind: .triceratops, count: 5, every: 2.4),
-            SpawnGroup(kind: .raptor, count: 8, every: 0.8, startAt: 3)
+            SpawnGroup(kind: .raptor, count: 16, every: 0.6),
+            SpawnGroup(kind: .compy, count: 14, every: 0.35, startAt: 4)
         ],
         [
-            SpawnGroup(kind: .compy, count: 24, every: 0.3),
-            SpawnGroup(kind: .raptor, count: 10, every: 0.6, startAt: 5)
+            SpawnGroup(kind: .triceratops, count: 7, every: 2.0),
+            SpawnGroup(kind: .raptor, count: 10, every: 0.7, startAt: 3)
         ],
         [
-            SpawnGroup(kind: .triceratops, count: 8, every: 1.8),
-            SpawnGroup(kind: .raptor, count: 12, every: 0.6, startAt: 4)
+            SpawnGroup(kind: .compy, count: 32, every: 0.25),
+            SpawnGroup(kind: .raptor, count: 14, every: 0.5, startAt: 4)
         ],
         [
-            SpawnGroup(kind: .raptor, count: 6, every: 0.7),
-            SpawnGroup(kind: .triceratops, count: 4, every: 2, startAt: 3),
-            SpawnGroup(kind: .rex, count: 1, every: 0, startAt: 10)
+            SpawnGroup(kind: .triceratops, count: 10, every: 1.5),
+            SpawnGroup(kind: .raptor, count: 16, every: 0.5, startAt: 3)
+        ],
+        [
+            SpawnGroup(kind: .raptor, count: 10, every: 0.6),
+            SpawnGroup(kind: .triceratops, count: 6, every: 1.8, startAt: 3),
+            SpawnGroup(kind: .rex, count: 1, every: 0, startAt: 10),
+            SpawnGroup(kind: .compy, count: 16, every: 0.3, startAt: 12)
         ]
     ]
 
-    /// Dinos get tougher every wave. `index` is zero based.
+    /// Dinos get tougher every wave, ramping up harder late. `index` is zero based.
     static func healthScale(forWave index: Int) -> CGFloat {
-        1 + 0.12 * CGFloat(index)
+        let i = CGFloat(index)
+        return 1 + 0.16 * i + 0.012 * i * i
     }
 
     /// Flattens a wave into spawn times, earliest first.

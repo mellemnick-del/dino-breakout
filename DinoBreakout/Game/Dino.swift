@@ -26,7 +26,7 @@ enum DinoKind {
         case .compy: 18
         case .raptor: 40
         case .triceratops: 200
-        case .rex: 1100
+        case .rex: 1300
         }
     }
 
@@ -34,7 +34,7 @@ enum DinoKind {
     var moveSpeed: CGFloat {
         switch self {
         case .compy: 1.7
-        case .raptor: 2.3
+        case .raptor: 2.5
         case .triceratops: 0.85
         case .rex: 0.6
         }
@@ -59,25 +59,6 @@ enum DinoKind {
         case .rex: 10
         }
     }
-
-    /// Placeholder art until real sprites are drawn.
-    var emoji: String {
-        switch self {
-        case .compy: "🦎"
-        case .raptor, .rex: "🦖"
-        case .triceratops: "🦕"
-        }
-    }
-
-    /// Size relative to one grid cell.
-    var scale: CGFloat {
-        switch self {
-        case .compy: 0.55
-        case .raptor: 0.7
-        case .triceratops: 0.95
-        case .rex: 1.5
-        }
-    }
 }
 
 final class Dino: SKNode {
@@ -91,30 +72,43 @@ final class Dino: SKNode {
 
     private var slowFactor: CGFloat = 1
     private var slowTimeLeft: TimeInterval = 0
-    private let body: SKLabelNode
+    private var heading: CGFloat = -.pi / 2
+    private let art: SKSpriteNode
+    private let shadow: SKShapeNode
+    private let shadowOffset: CGPoint
     private let sleepy: SKLabelNode
     private let barBack: SKSpriteNode
     private let bar: SKSpriteNode
 
-    init(kind: DinoKind, healthScale: CGFloat, cell: Cell, cellSize: CGFloat) {
+    init(kind: DinoKind, healthScale: CGFloat, cell: Cell, cellSize: CGFloat, screenScale: CGFloat) {
         self.kind = kind
         maxHealth = kind.baseHealth * healthScale
         health = maxHealth
         self.cell = cell
         target = cell
 
-        body = SKLabelNode(text: kind.emoji)
-        body.fontSize = cellSize * kind.scale
-        body.verticalAlignmentMode = .center
-        body.horizontalAlignmentMode = .center
+        let baked = DinoArt.bake(kind, cellSize: cellSize, screenScale: screenScale)
+        art = SKSpriteNode(texture: baked.frames[0])
+        art.anchorPoint = baked.anchor
+        art.zRotation = heading
+
+        shadow = SKShapeNode(ellipseOf: baked.shadowSize)
+        shadow.fillColor = SKColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.34)
+        shadow.strokeColor = .clear
+        shadowOffset = CGPoint(x: cellSize * 0.05, y: -cellSize * 0.08)
+        shadow.position = shadowOffset
+        shadow.zRotation = heading
+
+        let style = kind.style
+        let reach = style.cells * cellSize * 0.5
 
         sleepy = SKLabelNode(text: "💤")
         sleepy.fontSize = cellSize * 0.3
-        sleepy.position = CGPoint(x: cellSize * kind.scale * 0.35, y: cellSize * kind.scale * 0.3)
+        sleepy.position = CGPoint(x: reach * 0.5, y: reach * 0.4)
         sleepy.isHidden = true
 
-        let barWidth = cellSize * max(0.6, kind.scale * 0.8)
-        let barY = cellSize * kind.scale * 0.55
+        let barWidth = cellSize * max(0.6, style.cells * 0.55)
+        let barY = reach * 0.75 + cellSize * 0.1
         barBack = SKSpriteNode(color: SKColor(white: 0, alpha: 0.6), size: CGSize(width: barWidth, height: 4))
         barBack.position = CGPoint(x: 0, y: barY)
         bar = SKSpriteNode(color: .green, size: CGSize(width: barWidth, height: 4))
@@ -125,10 +119,18 @@ final class Dino: SKNode {
 
         super.init()
         zPosition = kind == .rex ? 6 : 5
-        addChild(body)
+        addChild(shadow)
+        addChild(art)
         addChild(sleepy)
         addChild(barBack)
         addChild(bar)
+
+        // Walk cycle, starting at a random step so a pack doesn't march in lockstep
+        let frames = baked.frames
+        let start = Int.random(in: 0..<frames.count)
+        let cycle = Array(frames[start...] + frames[..<start])
+        let timePerFrame = 1 / (Double(style.rate) * Double(frames.count))
+        art.run(.repeatForever(.animate(with: cycle, timePerFrame: timePerFrame)))
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -145,6 +147,7 @@ final class Dino: SKNode {
         slowTimeLeft -= dt
         if slowTimeLeft <= 0 {
             slowFactor = 1
+            art.speed = 1
             sleepy.isHidden = true
         }
     }
@@ -152,7 +155,19 @@ final class Dino: SKNode {
     func slow(to factor: CGFloat, for duration: TimeInterval) {
         slowFactor = min(slowFactor, factor)
         slowTimeLeft = max(slowTimeLeft, duration)
+        art.speed = slowFactor
         sleepy.isHidden = false
+    }
+
+    /// Turns smoothly toward the direction it's walking.
+    func steer(toward angle: CGFloat, dt: TimeInterval) {
+        var diff = angle - heading
+        while diff > .pi { diff -= 2 * .pi }
+        while diff < -.pi { diff += 2 * .pi }
+        let maxTurn = CGFloat(dt) * 9
+        heading += max(-maxTurn, min(maxTurn, diff))
+        art.zRotation = heading
+        shadow.zRotation = heading
     }
 
     /// Returns true if this hit took it down.
@@ -166,13 +181,14 @@ final class Dino: SKNode {
         barBack.isHidden = false
         if health <= 0 {
             isDead = true
+            art.removeAllActions()
             return true
         }
+        let flash = SKAction.sequence([
+            .colorize(with: .white, colorBlendFactor: 0.6, duration: 0.03),
+            .colorize(withColorBlendFactor: 0, duration: 0.1)
+        ])
+        art.run(flash, withKey: "flash")
         return false
-    }
-
-    /// The emoji faces left, so mirror it when walking right.
-    func face(right: Bool) {
-        body.xScale = right ? -1 : 1
     }
 }

@@ -21,7 +21,7 @@ final class GameScene: SKScene {
 
     private let cols = 9
     private let rows = 13
-    private let startingCash = 120
+    private let startingCash = 100
     private let startingLives = 20
     private let topHeight: CGFloat = 60
     private let bottomHeight: CGFloat = 120
@@ -53,9 +53,11 @@ final class GameScene: SKScene {
     private var tool: Tool? = .build(.fence)
     private var lastUpdate: TimeInterval = 0
     private var isOver = false
+    private var screenScale: CGFloat = 3
 
     override func didMove(to view: SKView) {
         backgroundColor = Palette.bar
+        screenScale = view.contentScaleFactor
         startNewGame()
     }
 
@@ -84,6 +86,11 @@ final class GameScene: SKScene {
             y: bottomHeight + (available - cellSize * CGFloat(rows)) / 2
         )
         drawBoard()
+
+        // Bake every dino's walk cycle now so the first spawn doesn't hitch
+        for kind in [DinoKind.compy, .raptor, .triceratops, .rex] {
+            _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: screenScale)
+        }
 
         hud = HUD(size: size, topHeight: topHeight, bottomHeight: bottomHeight)
         addChild(hud)
@@ -265,7 +272,8 @@ final class GameScene: SKScene {
             kind: kind,
             healthScale: Waves.healthScale(forWave: wavesStarted - 1),
             cell: grid.spawn,
-            cellSize: cellSize
+            cellSize: cellSize,
+            screenScale: screenScale
         )
         dino.target = grid.nextStep(from: grid.spawn) ?? grid.spawn
         dino.position = point(for: grid.spawn)
@@ -281,7 +289,7 @@ final class GameScene: SKScene {
     private func checkWaveEnd() {
         guard waveActive, spawnQueue.isEmpty, dinos.isEmpty else { return }
         waveActive = false
-        let bonus = 10 + 3 * wavesStarted
+        let bonus = 8 + 2 * wavesStarted
         cash += bonus
         if wavesStarted == Waves.all.count {
             endGame(won: true)
@@ -315,9 +323,6 @@ final class GameScene: SKScene {
                 let dx = dest.x - dino.position.x
                 let dy = dest.y - dino.position.y
                 let dist = hypot(dx, dy)
-                if abs(dx) > 0.5 {
-                    dino.face(right: dx > 0)
-                }
                 if dist > budget {
                     dino.position.x += dx / dist * budget
                     dino.position.y += dy / dist * budget
@@ -332,6 +337,11 @@ final class GameScene: SKScene {
                 }
                 guard let next = grid.nextStep(from: dino.cell) else { break }
                 dino.target = next
+            }
+
+            let ahead = point(for: dino.target)
+            if hypot(ahead.x - dino.position.x, ahead.y - dino.position.y) > 0.5 {
+                dino.steer(toward: atan2(ahead.y - dino.position.y, ahead.x - dino.position.x), dt: dt)
             }
         }
 
