@@ -2,11 +2,21 @@ import GameKit
 
 /// Game Center sign in and leaderboards for endless records and daily challenges.
 ///
-/// Off until the app is set up in App Store Connect: Game Center needs a paid
-/// Apple Developer account, the Game Center capability on the target, and
-/// leaderboards created with the IDs below. Then flip `isConfigured` to true.
+/// The Game Center capability is on (DinoBreakout.entitlements). Scores only
+/// show up once the leaderboards below exist in App Store Connect; until then
+/// submissions quietly fail, which is harmless.
 enum GameCenter {
-    static let isConfigured = false
+    static let isConfigured = true
+
+    /// Signed in and ready for leaderboards.
+    static var isAvailable: Bool {
+        isConfigured && GKLocalPlayer.local.isAuthenticated
+    }
+
+    static func showLeaderboards() {
+        guard isAvailable else { return }
+        GKAccessPoint.shared.trigger(state: .leaderboards) {}
+    }
 
     /// Leaderboard IDs to create in App Store Connect (one per park, plus daily).
     static func endlessLeaderboard(for level: Level) -> String {

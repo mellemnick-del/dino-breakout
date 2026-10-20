@@ -182,8 +182,14 @@ enum Progress {
     /// Hidden switch for playtesting: everything unlocked, lots of cash, nothing recorded.
     static let testModeKey = "testMode"
 
+    /// Only exists in builds run from Xcode. TestFlight and App Store builds
+    /// never have it, since Apple doesn't allow hidden features.
     static var testMode: Bool {
-        UserDefaults.standard.bool(forKey: testModeKey)
+        #if DEBUG
+        return UserDefaults.standard.bool(forKey: testModeKey)
+        #else
+        return false
+        #endif
     }
 
     /// One star at wave 10, two at wave 25, three for beating all 50.

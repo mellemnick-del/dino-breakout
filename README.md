@@ -16,7 +16,7 @@ The game opens on a title screen with dinos roaming the park behind it.
 - **Parks**, in unlock order: Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), Jungle River (a river with two bridges), Visitor Center (buildings to maze around), The Aviary (pterodactyls from wave 3), and Night Shift (dark except where your towers light it up), Mount Ember (lava pools on volcanic ash). Each park unlocks when you reach wave 10 on the one before it, on any difficulty.
 - **Daily challenge:** the card at the top of the menu. Every date picks a park, difficulty, and twist (Sky Swarm, No Fences, Rich but Stingy, Fast Dinos, Five Lives, or Armored Up), the same on every device. Survive 20 waves to complete it.
 - **Achievements** (trophy button): 14 to earn, from First Bite to Never Off (wave 75 in endless). A banner pops up in game when you earn one.
-- **Test mode:** tap the big DINO title 7 times. Every park and endless mode unlock, you start with $9,999, and nothing counts toward stars, records, or achievements. Tap 7 more times to turn it off.
+- **Test mode** (builds run from Xcode only): tap the big DINO title 7 times. Every park and endless mode unlock, you start with $9,999, and nothing counts toward stars, records, or achievements. Tap 7 more times to turn it off.
 - **Endless mode:** beat all 50 waves on a park (any difficulty) and its card gets an Endless button. Waves never stop: crowds grow until wave 60, then health keeps climbing, with a T-Rex boss wave every 10 (up to 6 T-Rexes) and pterodactyl flocks. You can also tap **Keep Going** on the victory screen to carry your towers straight into endless. Your endless record is saved per park and difficulty.
 - **Stars:** one at wave 10, two at wave 25, three for beating all 50, tracked per park and difficulty. Each card shows its stars and best wave, and the header shows your total.
 - **Settings** (gear): separate Music and Sound effects volume. All audio is synthesized in code (`Sound.swift`), and it follows the phone's silent switch.
@@ -134,6 +134,8 @@ TestFlight lets you (and your family) install the game from Apple's TestFlight a
 For every new upload, raise the **Build** number (target, General tab) before archiving, or App Store Connect will reject it.
 
 ## App Store
+
+Step by step from your Mac to Submitted for Review: `docs/ReleaseChecklist.md`. The support and privacy pages Apple requires are ready in `docs/site`.
 
 The full listing (name, subtitle, description, keywords, category, age rating, privacy answers, and a screenshot plan) is in `docs/AppStoreListing.md`, along with the steps to turn on Game Center leaderboards for endless records and daily challenges.
 

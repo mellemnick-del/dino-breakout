@@ -78,7 +78,7 @@ struct MenuView: View {
                         .foregroundStyle(MenuColor.hazard)
                 }
                 Spacer()
-                if testMode {
+                if testMode && Progress.testMode {
                     Text("TEST MODE")
                         .font(.system(size: 11, weight: .heavy, design: .monospaced))
                         .foregroundStyle(MenuColor.hazardInk)
@@ -115,12 +115,14 @@ struct MenuView: View {
                 .font(.system(size: 68, weight: .black, design: .rounded))
                 .foregroundStyle(MenuColor.text)
                 .onTapGesture {
-                    // Seven taps on the title flips the hidden test mode
+                    #if DEBUG
+                    // Seven taps on the title flips test mode (Xcode builds only)
                     titleTaps += 1
                     if titleTaps >= 7 {
                         titleTaps = 0
                         testMode.toggle()
                     }
+                    #endif
                 }
             Text("BREAKOUT")
                 .font(.system(size: 52, weight: .black, design: .rounded))
@@ -466,6 +468,16 @@ struct TrophyRoom: View {
                 } footer: {
                     if Progress.testMode {
                         Text("Test mode is on, so nothing can be earned right now.")
+                    }
+                }
+
+                if GameCenter.isAvailable {
+                    Section("Game Center") {
+                        Button {
+                            GameCenter.showLeaderboards()
+                        } label: {
+                            Label("Leaderboards", systemImage: "list.number")
+                        }
                     }
                 }
             }
