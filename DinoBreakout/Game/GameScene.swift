@@ -19,16 +19,19 @@ private final class Shot {
 final class GameScene: SKScene {
     // MARK: Tuning
 
-    private let cols = 7
-    private let rows = 11
-    private let startingCash = 100
-    private let startingLives = 20
+    private let cols = Level.cols
+    private let rows = Level.rows
     private let topHeight: CGFloat = 60
     private let bottomHeight: CGFloat = 120
 
+    let level: Level
+    let difficulty: Difficulty
+    /// Called when the player leaves for the main menu.
+    var onExit: (() -> Void)?
+
     // MARK: State
 
-    private var grid = Grid(cols: 7, rows: 11)
+    private var grid: Grid
     private var cellSize: CGFloat = 40
     private var origin: CGPoint = .zero
 
@@ -65,6 +68,23 @@ final class GameScene: SKScene {
     private var sparkTimer: TimeInterval = 1
     /// Showing while the game is paused.
     private var pauseMenu: SKNode?
+    /// Showing once the game is won or lost.
+    private var gameOverOverlay: SKNode?
+    /// Upgrade and sell panel for the tower you tapped.
+    private var towerPanel: SKNode?
+    private weak var selectedTower: Tower?
+    private var selectedRing: SKShapeNode?
+
+    init(size: CGSize, level: Level, difficulty: Difficulty) {
+        self.level = level
+        self.difficulty = difficulty
+        grid = Grid(level: level)
+        super.init(size: size)
+    }
+
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) is not used")
+    }
 
     override func didMove(to view: SKView) {
         backgroundColor = Palette.bar
@@ -82,7 +102,11 @@ final class GameScene: SKScene {
         world.position = .zero
         addChild(world)
 
-        grid = Grid(cols: cols, rows: rows)
+        grid = Grid(level: level)
+        gameOverOverlay = nil
+        towerPanel = nil
+        selectedTower = nil
+        selectedRing = nil
         towers = [:]
         dinos = []
         shots = []
@@ -113,13 +137,13 @@ final class GameScene: SKScene {
 
         hud = HUD(size: size, topHeight: topHeight, bottomHeight: bottomHeight)
         addChild(hud)
-        cash = startingCash
-        lives = startingLives
+        cash = difficulty.startingCash
+        lives = difficulty.lives
         hud.setWave(0, of: Waves.total)
         hud.setSendEnabled(true)
         tool = .build(.fence)
         hud.select(tool)
-        hud.flash("Build a maze, then tap Send Wave")
+        hud.flash("\(level.name) · \(difficulty.title). Build a maze, then tap Send Wave")
     }
 
     private func drawBoard() {
@@ -136,8 +160,35 @@ final class GameScene: SKScene {
             .fadeAlpha(to: 1, duration: 0.5)
         ])))
 
+        buildTerrain()
         buildGate()
         buildHelipad()
+    }
+
+    /// Boulders, river, and bridges for this park.
+    private func buildTerrain() {
+        let square = CGSize(width: cellSize, height: cellSize)
+        for cell in level.water {
+            let frames = (0..<3).map { ParkArt.water(cell: cellSize, frame: $0) }
+            let water = SKSpriteNode(texture: frames[0], size: square)
+            water.position = point(for: cell)
+            water.zPosition = 0.3
+            water.run(.repeatForever(.animate(with: frames, timePerFrame: 0.4)))
+            world.addChild(water)
+        }
+        for cell in level.bridges {
+            let bridge = SKSpriteNode(texture: ParkArt.bridge(cell: cellSize), size: square)
+            bridge.position = point(for: cell)
+            bridge.zPosition = 0.3
+            world.addChild(bridge)
+        }
+        for cell in level.rocks {
+            let variant = Int(ParkArt.hash(CGFloat(cell.col) + 3, CGFloat(cell.row)) * 3)
+            let rock = SKSpriteNode(texture: ParkArt.boulder(cell: cellSize, variant: variant), size: square)
+            rock.position = point(for: cell)
+            rock.zPosition = 2
+            world.addChild(rock)
+        }
     }
 
     /// Steel paddock gate on the spawn square. Doors swing open while a wave is on.
@@ -312,8 +363,13 @@ final class GameScene: SKScene {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
-        if isOver {
-            startNewGame()
+        if let overlay = gameOverOverlay {
+            let hits = overlay.nodes(at: touch.location(in: overlay)).compactMap { $0.name }
+            if hits.contains("restart") {
+                startNewGame()
+            } else if hits.contains("menu") {
+                onExit?()
+            }
             return
         }
         if let menu = pauseMenu {
@@ -322,8 +378,31 @@ final class GameScene: SKScene {
                 startNewGame()
             } else if hits.contains("resume") {
                 closePauseMenu()
+            } else if hits.contains("menu") {
+                onExit?()
             }
             return
+        }
+        if let panel = towerPanel {
+            let hits = panel.nodes(at: touch.location(in: panel)).compactMap { $0.name }
+            if hits.contains("upgrade"), let tower = selectedTower {
+                upgrade(tower)
+                showPanel(for: tower)
+                return
+            }
+            if hits.contains("sell"), let tower = selectedTower {
+                closePanel()
+                sell(tower)
+                return
+            }
+            if hits.contains("panel") {
+                return
+            }
+            let previous = selectedTower?.cell
+            closePanel()
+            if let tapped = cell(at: touch.location(in: world)), tapped == previous {
+                return
+            }
         }
         if let action = hud.action(at: touch.location(in: self)) {
             switch action {
@@ -347,13 +426,17 @@ final class GameScene: SKScene {
             if tool == .sell {
                 sell(tower)
             } else {
-                upgrade(tower)
+                showPanel(for: tower)
             }
             return
         }
 
         guard case .build(let kind)? = tool else {
             hud.flash("Pick something to build")
+            return
+        }
+        if grid.terrain.contains(cell) {
+            hud.flash(level.water.contains(cell) ? "Can't build in the river" : "Can't build on a boulder")
             return
         }
         if cell == grid.spawn || cell == grid.exit {
@@ -375,6 +458,7 @@ final class GameScene: SKScene {
         }
 
         cash -= kind.cost
+        SoundBank.shared.play(.place)
         let tower = Tower(kind: kind, cell: cell, cellSize: cellSize)
         tower.position = point(for: cell)
         tower.setScale(0.6)
@@ -385,6 +469,7 @@ final class GameScene: SKScene {
             rebuildWires()
         } else {
             showRange(of: tower)
+            hud.flash("Tap any tower to upgrade or sell it")
         }
     }
 
@@ -399,11 +484,13 @@ final class GameScene: SKScene {
         }
         cash -= cost
         tower.upgrade()
+        SoundBank.shared.play(.upgrade)
         hud.flash("\(tower.kind.title) level \(tower.level)")
         showRange(of: tower)
     }
 
     private func sell(_ tower: Tower) {
+        SoundBank.shared.play(.sell)
         cash += tower.sellValue
         floatText("+$\(tower.sellValue)", at: tower.position)
         towers[tower.cell] = nil
@@ -426,6 +513,7 @@ final class GameScene: SKScene {
         hud.setWave(wavesStarted, of: Waves.total)
         hud.setSendEnabled(false, title: "Incoming")
         setGate(open: true)
+        SoundBank.shared.play(.alarm)
         hud.flash("Wave \(wavesStarted): \(Waves.summary(wave))")
     }
 
@@ -441,7 +529,7 @@ final class GameScene: SKScene {
     private func spawn(_ kind: DinoKind) {
         let dino = Dino(
             kind: kind,
-            healthScale: Waves.healthScale(forWave: wavesStarted - 1),
+            healthScale: Waves.healthScale(forWave: wavesStarted - 1) * difficulty.health,
             cell: grid.spawn,
             cellSize: cellSize,
             screenScale: screenScale
@@ -454,6 +542,7 @@ final class GameScene: SKScene {
         if kind == .rex {
             hud.flash("🦖 The ground is shaking...")
             shakeWorld()
+            SoundBank.shared.play(.roar)
         }
     }
 
@@ -461,6 +550,7 @@ final class GameScene: SKScene {
         guard waveActive, spawnQueue.isEmpty, dinos.isEmpty else { return }
         waveActive = false
         setGate(open: false)
+        Progress.record(wave: wavesStarted, level: level, difficulty: difficulty)
         let bonus = 8 + 2 * wavesStarted
         cash += bonus
         if wavesStarted == Waves.total {
@@ -523,6 +613,7 @@ final class GameScene: SKScene {
             dinos.removeAll { $0 === dino }
             dino.run(.sequence([.fadeOut(withDuration: 0.2), .removeFromParent()]))
             lives = max(0, lives - dino.kind.damage)
+            SoundBank.shared.play(.escape)
             hud.flash("\(dino.kind.name) reached the helipad!")
             flashDanger()
             if lives == 0 {
@@ -544,6 +635,7 @@ final class GameScene: SKScene {
             if tower.kind == .flare {
                 tower.showFire()
                 pulse(from: tower, radius: reach)
+                SoundBank.shared.play(.flare)
                 for dino in inRange {
                     hit(dino, for: tower.damage)
                 }
@@ -558,6 +650,7 @@ final class GameScene: SKScene {
     private func fire(from tower: Tower, at target: Dino) {
         tower.showFire()
         let isDart = tower.kind == .tranq
+        SoundBank.shared.play(isDart ? .tranq : .turret)
         let node = isDart
             ? SKSpriteNode(texture: ParkArt.dart(cell: cellSize), size: CGSize(width: cellSize * 0.26, height: cellSize * 0.1))
             : SKSpriteNode(texture: ParkArt.tracer(cell: cellSize), size: CGSize(width: cellSize * 0.3, height: cellSize * 0.1))
@@ -583,6 +676,7 @@ final class GameScene: SKScene {
             shot.node.zRotation = atan2(dy, dx)
             if dist <= step {
                 puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
+                SoundBank.shared.play(.hit)
                 hit(shot.target, for: shot.damage, slow: shot.slow)
                 shot.node.removeFromParent()
                 shot.done = true
@@ -605,9 +699,11 @@ final class GameScene: SKScene {
     }
 
     private func kill(_ dino: Dino) {
-        let reward = Int((CGFloat(dino.kind.reward) * Waves.rewardScale(forWave: max(0, wavesStarted - 1))).rounded())
+        let scale = Waves.rewardScale(forWave: max(0, wavesStarted - 1)) * difficulty.bounty
+        let reward = max(1, Int((CGFloat(dino.kind.reward) * scale).rounded()))
         cash += reward
         floatText("+$\(reward)", at: dino.position)
+        SoundBank.shared.play(.dinoDown, volume: dino.kind == .compy ? 0.5 : 1)
         dinos.removeAll { $0 === dino }
         dino.run(.sequence([
             .group([.fadeOut(withDuration: 0.25), .scale(to: 1.4, duration: 0.25)]),
@@ -643,24 +739,108 @@ final class GameScene: SKScene {
         overlay.addChild(title)
 
         let detail = makeLabel(
-            won ? "Everyone made it out. \(lives) lives left." : "The dinos overran the helipad on wave \(wavesStarted).",
+            won ? "Everyone made it out of \(level.name). \(lives) lives left." : "The dinos overran \(level.name) on wave \(wavesStarted).",
             size: 15
         )
         detail.position = CGPoint(x: 0, y: -8)
         overlay.addChild(detail)
 
-        let again = makeLabel("Tap to play again", size: 15, color: Palette.muted)
-        again.position = CGPoint(x: 0, y: -44)
-        overlay.addChild(again)
+        overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -60))
+        overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -120))
+        gameOverOverlay = overlay
+        SoundBank.shared.play(won ? .win : .lose)
 
         overlay.alpha = 0
         overlay.run(.sequence([.wait(forDuration: won ? 1.2 : 0), .fadeIn(withDuration: 0.3)]))
+    }
+
+    // MARK: - Tower panel
+
+    /// Shows a tower's level with Upgrade and Sell buttons, plus its range.
+    private func showPanel(for tower: Tower) {
+        closePanel()
+        selectedTower = tower
+
+        if tower.kind != .fence {
+            let ring = SKShapeNode(circleOfRadius: tower.range * cellSize)
+            ring.position = tower.position
+            ring.strokeColor = SKColor(white: 1, alpha: 0.6)
+            ring.fillColor = SKColor(white: 1, alpha: 0.08)
+            ring.lineWidth = 1.5
+            ring.zPosition = 2.8
+            world.addChild(ring)
+            selectedRing = ring
+        }
+
+        let width: CGFloat = 230
+        let height: CGFloat = 100
+        let panel = SKNode()
+        panel.zPosition = 90
+
+        let background = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 14)
+        background.name = "panel"
+        background.fillColor = Palette.bar.withAlphaComponent(0.96)
+        background.strokeColor = Palette.warning.withAlphaComponent(0.55)
+        background.lineWidth = 1.5
+        panel.addChild(background)
+
+        let title = tower.kind == .fence
+            ? "Electric fence"
+            : "\(tower.kind.title)  ·  Level \(tower.level) of \(Tower.maxLevel)"
+        let titleLabel = makeLabel(title, size: 15, font: Fonts.heavy)
+        titleLabel.name = "panel"
+        titleLabel.position = CGPoint(x: 0, y: 26)
+        panel.addChild(titleLabel)
+
+        let sellTitle = "Sell $\(tower.sellValue)"
+        if tower.kind == .fence {
+            panel.addChild(menuButton(sellTitle, name: "sell", fill: Palette.panel, text: Palette.text, outlined: true,
+                                      y: -14, width: width - 24, height: 42, fontSize: 15))
+        } else {
+            let upgradeTitle: String
+            let canAfford: Bool
+            if let cost = tower.upgradeCost {
+                upgradeTitle = "Upgrade $\(cost)"
+                canAfford = cash >= cost
+            } else {
+                upgradeTitle = "Max level"
+                canAfford = false
+            }
+            panel.addChild(menuButton(upgradeTitle, name: "upgrade",
+                                      fill: canAfford ? Palette.warning : Palette.panel,
+                                      text: canAfford ? Palette.bar : Palette.muted,
+                                      outlined: !canAfford,
+                                      x: -width / 2 + 12 + 63, y: -14, width: 126, height: 42, fontSize: 15))
+            panel.addChild(menuButton(sellTitle, name: "sell", fill: Palette.panel, text: Palette.text, outlined: true,
+                                      x: width / 2 - 12 - 38, y: -14, width: 76, height: 42, fontSize: 14))
+        }
+
+        let towerPoint = convert(tower.position, from: world)
+        var y = towerPoint.y + cellSize * 0.6 + height / 2 + 6
+        if y + height / 2 > size.height - topHeight - 4 {
+            y = towerPoint.y - cellSize * 0.6 - height / 2 - 6
+        }
+        let x = min(max(towerPoint.x, width / 2 + 8), size.width - width / 2 - 8)
+        panel.position = CGPoint(x: x, y: y)
+        panel.setScale(0.85)
+        panel.run(.scale(to: 1, duration: 0.1))
+        addChild(panel)
+        towerPanel = panel
+    }
+
+    private func closePanel() {
+        towerPanel?.removeFromParent()
+        towerPanel = nil
+        selectedRing?.removeFromParent()
+        selectedRing = nil
+        selectedTower = nil
     }
 
     // MARK: - Pause menu
 
     private func openPauseMenu() {
         guard pauseMenu == nil, !isOver else { return }
+        closePanel()
         world.isPaused = true
 
         let menu = SKNode()
@@ -682,9 +862,10 @@ final class GameScene: SKScene {
 
         menu.addChild(menuButton("Resume", name: "resume", fill: Palette.warning, text: Palette.bar, outlined: false, y: 10))
         menu.addChild(menuButton("Restart", name: "restart", fill: Palette.panel, text: Palette.danger, outlined: true, y: -50))
+        menu.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -110))
 
-        let note = makeLabel("Restarting starts over from wave 1", size: 13, color: Palette.muted)
-        note.position = CGPoint(x: 0, y: -94)
+        let note = makeLabel("Restart and Main Menu end this run", size: 13, color: Palette.muted)
+        note.position = CGPoint(x: 0, y: -156)
         menu.addChild(note)
     }
 
@@ -694,14 +875,17 @@ final class GameScene: SKScene {
         world.isPaused = false
     }
 
-    private func menuButton(_ title: String, name: String, fill: SKColor, text: SKColor, outlined: Bool, y: CGFloat) -> SKNode {
-        let button = SKShapeNode(rectOf: CGSize(width: 200, height: 48), cornerRadius: 12)
+    private func menuButton(
+        _ title: String, name: String, fill: SKColor, text: SKColor, outlined: Bool,
+        x: CGFloat = 0, y: CGFloat, width: CGFloat = 200, height: CGFloat = 48, fontSize: CGFloat = 18
+    ) -> SKNode {
+        let button = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 12)
         button.name = name
         button.fillColor = fill
         button.strokeColor = text.withAlphaComponent(0.6)
         button.lineWidth = outlined ? 2 : 0
-        button.position = CGPoint(x: 0, y: y)
-        let label = makeLabel(title, size: 18, font: Fonts.heavy, color: text)
+        button.position = CGPoint(x: x, y: y)
+        let label = makeLabel(title, size: fontSize, font: Fonts.heavy, color: text)
         label.name = name
         button.addChild(label)
         return button
@@ -770,6 +954,9 @@ final class GameScene: SKScene {
         guard sparkTimer <= 0 else { return }
         sparkTimer = TimeInterval.random(in: 0.3...1.0)
         guard let post = towers.values.filter({ $0.kind == .fence }).randomElement() else { return }
+        if Int.random(in: 0..<3) == 0 {
+            SoundBank.shared.play(.zap)
+        }
         let offset = CGPoint(x: cellSize * 0.1, y: cellSize * 0.1)
         puff(at: CGPoint(x: post.position.x + offset.x, y: post.position.y + offset.y), color: UIColor(hex: 0xE8F6FF))
     }

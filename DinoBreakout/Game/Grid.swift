@@ -13,19 +13,27 @@ final class Grid {
 
     let cols: Int
     let rows: Int
-    /// Paddock gate at the top, where dinos break out.
+    /// Paddock gate, where dinos break out.
     let spawn: Cell
-    /// Evac helipad at the bottom, what you're defending.
+    /// Evac helipad, what you're defending.
     let exit: Cell
+    /// Boulders and water: always blocked, never buildable.
+    let terrain: Set<Cell>
     private(set) var blocked: Set<Cell> = []
     private var field: [Int] = []
 
-    init(cols: Int, rows: Int) {
+    init(cols: Int, rows: Int, spawn: Cell, exit: Cell, terrain: Set<Cell> = []) {
         self.cols = cols
         self.rows = rows
-        spawn = Cell(col: cols / 2, row: rows - 1)
-        exit = Cell(col: cols / 2, row: 0)
+        self.spawn = spawn
+        self.exit = exit
+        self.terrain = terrain
+        blocked = terrain
         field = buildField(blocked: blocked)
+    }
+
+    convenience init(level: Level) {
+        self.init(cols: Level.cols, rows: Level.rows, spawn: level.spawn, exit: level.exit, terrain: level.terrain)
     }
 
     func contains(_ cell: Cell) -> Bool {
@@ -61,7 +69,7 @@ final class Grid {
     }
 
     func unblock(_ cell: Cell) {
-        guard blocked.remove(cell) != nil else { return }
+        guard !terrain.contains(cell), blocked.remove(cell) != nil else { return }
         field = buildField(blocked: blocked)
     }
 

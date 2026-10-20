@@ -326,6 +326,90 @@ enum ParkArt {
         }
     }
 
+    // MARK: Terrain
+
+    /// A mossy boulder filling a square. Three shapes.
+    static func boulder(cell c: CGFloat, variant: Int) -> SKTexture {
+        texture("boulder-\(variant)-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
+            let lw = lineWidth(c)
+            let points = 9
+            var outlinePoints: [CGPoint] = []
+            for i in 0..<points {
+                let a = CGFloat(i) / CGFloat(points) * .pi * 2
+                let r = c * (0.36 + hash(CGFloat(i), CGFloat(variant) + 1) * 0.08)
+                outlinePoints.append(CGPoint(x: cos(a) * r, y: sin(a) * r * 0.9))
+            }
+            func addBlob(offset: CGPoint, scale: CGFloat) {
+                let pts = outlinePoints.map { CGPoint(x: $0.x * scale + offset.x, y: $0.y * scale + offset.y) }
+                ctx.move(to: CGPoint(x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2))
+                for i in 1...pts.count {
+                    let p = pts[i % pts.count]
+                    let q = pts[(i + 1) % pts.count]
+                    ctx.addQuadCurve(to: CGPoint(x: (p.x + q.x) / 2, y: (p.y + q.y) / 2), control: p)
+                }
+                ctx.closePath()
+            }
+            addBlob(offset: CGPoint(x: c * 0.04, y: c * 0.06), scale: 1)
+            fill(ctx, shadow, 0.32)
+            addBlob(offset: .zero, scale: 1)
+            ink(ctx, UIColor(hex: 0x7B8073), lw)
+            addBlob(offset: CGPoint(x: -c * 0.06, y: -c * 0.07), scale: 0.6)
+            fill(ctx, UIColor(hex: 0x9DA293))
+            ctx.move(to: CGPoint(x: -c * 0.05, y: c * 0.05))
+            ctx.addLine(to: CGPoint(x: c * 0.12, y: c * 0.16))
+            ctx.setStrokeColor(UIColor(hex: 0x5D6257).cgColor)
+            ctx.setLineWidth(lw)
+            ctx.strokePath()
+            for i in 0..<3 {
+                let fi = CGFloat(i)
+                circle(ctx, c * (0.1 - 0.08 * fi), -c * (0.2 - 0.05 * fi), c * (0.06 - 0.01 * fi))
+                fill(ctx, UIColor(hex: 0x5C8F3E))
+            }
+        }
+    }
+
+    /// A river square. Tiles cleanly next to other river squares.
+    static func water(cell c: CGFloat, frame: Int) -> SKTexture {
+        texture("water-\(frame)-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
+            ctx.setFillColor(UIColor(hex: 0x2E6E8E).cgColor)
+            ctx.fill(CGRect(x: -c / 2, y: -c / 2, width: c + 0.5, height: c + 0.5))
+            ctx.setFillColor(UIColor(hex: 0x245A75).cgColor)
+            ctx.fill(CGRect(x: -c / 2, y: -c / 2, width: c + 0.5, height: c * 0.12))
+            ctx.fill(CGRect(x: -c / 2, y: c / 2 - c * 0.12, width: c + 0.5, height: c * 0.12))
+            let shift = CGFloat(frame) * c * 0.12
+            ctx.setStrokeColor(UIColor(hex: 0x7FC3DE).withAlphaComponent(0.7).cgColor)
+            ctx.setLineWidth(max(1.2, c * 0.025))
+            for (i, y) in [-c * 0.18, c * 0.04, c * 0.24].enumerated() {
+                let x = -c * 0.35 + shift + CGFloat(i) * c * 0.12
+                ctx.move(to: CGPoint(x: x, y: y))
+                ctx.addQuadCurve(to: CGPoint(x: x + c * 0.2, y: y), control: CGPoint(x: x + c * 0.1, y: y - c * 0.05))
+            }
+            ctx.strokePath()
+        }
+    }
+
+    /// Wooden planks laid over a river crossing.
+    static func bridge(cell c: CGFloat) -> SKTexture {
+        texture("bridge-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
+            let lw = lineWidth(c)
+            ctx.setFillColor(UIColor(hex: 0x2E6E8E).cgColor)
+            ctx.fill(CGRect(x: -c / 2, y: -c / 2, width: c + 0.5, height: c + 0.5))
+            let plank = c * 0.16
+            var y = -c / 2 + c * 0.02
+            var i = 0
+            while y < c / 2 - plank * 0.5 {
+                rr(ctx, -c * 0.4, y, c * 0.8, plank * 0.86, c * 0.02)
+                ink(ctx, i % 2 == 0 ? UIColor(hex: 0x9A7446) : UIColor(hex: 0x8A6640), lw)
+                y += plank
+                i += 1
+            }
+            for x in [-c * 0.42, c * 0.42] {
+                line(ctx, CGPoint(x: x, y: -c / 2), CGPoint(x: x, y: c / 2), outline, lw * 3)
+                line(ctx, CGPoint(x: x, y: -c / 2), CGPoint(x: x, y: c / 2), UIColor(hex: 0x6B4E2E), lw * 1.6)
+            }
+        }
+    }
+
     // MARK: HUD icons
 
     static func icon(for tool: Tool, size: CGFloat) -> SKTexture {

@@ -8,13 +8,23 @@ A mazing tower defense game for iPhone. The park's power has failed and the dino
 
 > Inspired by the "park gone wrong" genre, with all original names and art. No Jurassic Park names, logos, characters, or music.
 
+## Menu
+
+The game opens on a title screen with dinos roaming the park behind it.
+
+- **Difficulty:** Easy (30 lives, $150), Medium (20 lives, $100), or Hard (10 lives, $80, tougher dinos, smaller bounties).
+- **Parks:** Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), and Jungle River (a river with two bridges). Each card shows your best wave for the chosen difficulty.
+- **Settings** (gear): separate Music and Sound effects volume. All audio is synthesized in code (`Sound.swift`), and it follows the phone's silent switch.
+
+New parks are added in `Level.swift`: a gate square, a helipad square, and any boulders, river squares, and bridges.
+
 ## How to play
 
 - Dinos break out of the **paddock gate** 🚧 at the top and run for the **helipad** 🚁 at the bottom.
 - Pick something from the build bar, then tap an empty square to place it.
 - You can never fully block the path. If a placement would seal the dinos in, it's refused.
-- Tap a tower you already built to **upgrade** it (up to level 3, shown by the yellow dots).
-- Pick **Sell** and tap a tower to get 70% of what you spent back.
+- Tap any tower you built to open its panel: its level (1 of 3, also shown as rank chevrons), an **Upgrade** button with the price, **Sell** for 70% back, and its range.
+- Or pick **Sell** in the build bar and tap towers to sell them quickly.
 - Tap **Send Wave** when your maze is ready. Clearing a wave pays a bonus.
 - Survive 50 waves to win. Every tenth wave is a T-Rex boss wave, with one more T-Rex each time.
 - Tap the pause button (top left) to pause, resume, or restart from wave 1.
@@ -60,7 +70,7 @@ To get new changes later: **Integrate > Pull**.
 
 ```
 DinoBreakout/
-  App/   App entry point and the SwiftUI view hosting the game
+  App/   App entry point, main menu, settings, and the menu's backdrop scene
   Game/
     GameScene.swift   Game loop, input, waves, combat, effects
     Grid.swift        The map and the pathfinding distance field
@@ -68,13 +78,15 @@ DinoBreakout/
     DinoArt.swift     Dino colors and shapes, and the walk cycle renderer
     Tower.swift       Build pieces, stats, and upgrades
     Waves.swift       The 50 waves and difficulty scaling
+    Level.swift       Parks, difficulty settings, and saved best waves
+    Sound.swift       Synthesized sound effects and music
     ParkArt.swift     Towers, fences, gate, helipad, ground, and effects art
     HUD.swift         Top bar, build bar, colors, fonts
 ```
 
 ### How the pathfinding works
 
-`Grid` keeps a distance map: for every square, how many steps it is to the helipad. Each dino just steps to whichever neighbor is closest. When you place or sell something, the map is rebuilt (a breadth first search, instant on a 7 x 11 board), and every dino reroutes on its next step. Placements are only allowed if the paddock gate, and every square a dino is standing on or heading to, can still reach the helipad.
+`Grid` keeps a distance map: for every square, how many steps it is to the helipad. Each dino just steps to whichever neighbor is closest. When you place or sell something, the map is rebuilt (a breadth first search, instant on a 9 x 13 board), and every dino reroutes on its next step. Placements are only allowed if the paddock gate, and every square a dino is standing on or heading to, can still reach the helipad.
 
 ### Tuning
 
@@ -89,7 +101,6 @@ All the numbers live in a few obvious places:
 ## Roadmap
 
 Next up:
-- Sound: footsteps, tranq pops, fence hum, the T-Rex roar
 - Pteranodons that fly over the maze (and an anti-air tower)
 - Raptors that test fences for weak spots, triceratops that smash through them
 - A generator that powers fences and turrets and has to be protected
