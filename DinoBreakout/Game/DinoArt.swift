@@ -39,7 +39,7 @@ struct DinoStyle {
     }
 
     enum Marks {
-        case spots, stripes, ridge, blotches, plain
+        case spots, stripes, ridge, blotches, plain, plates
     }
 
     let skin: UIColor
@@ -134,6 +134,21 @@ extension DinoKind {
                 arms: [],
                 head: .trike(length: 36),
                 marks: .blotches, cells: 1.75
+            )
+        case .stegosaurus:
+            DinoStyle(
+                skin: UIColor(hex: 0x6F8090), light: UIColor(hex: 0x9DAEBC), dark: UIColor(hex: 0x3E4A56), eye: UIColor(hex: 0x1A1A10),
+                spine: [(0, 10), (-8, 22), (-20, 36), (-34, 42), (-48, 40), (-60, 30), (-72, 18), (-84, 9), (-94, 3), (-100, 1)],
+                hip: 52, sway: 1, wag: 3, wave: 0.05, stride: 5, rate: 0.9,
+                legs: [
+                    DinoLeg(x: -16, side: 1, spread: 20, rx: 9, ry: 8, off: 0),
+                    DinoLeg(x: -16, side: -1, spread: 20, rx: 9, ry: 8, off: .pi),
+                    DinoLeg(x: -50, side: 1, spread: 23, rx: 10, ry: 9, off: .pi),
+                    DinoLeg(x: -50, side: -1, spread: 23, rx: 10, ry: 9, off: 0)
+                ],
+                arms: [],
+                head: .theropod(length: 16, widths: [10, 11, 10, 8, 5], teeth: 0, brow: false),
+                marks: .plates, cells: 1.5
             )
         case .rex:
             DinoStyle(
@@ -428,6 +443,35 @@ enum DinoArt {
             }
         case .plain:
             break
+        case .plates:
+            // Two staggered rows of back plates, then the spiked tail
+            let plate = UIColor(hex: 0xC9603A)
+            for i in 1..<min(8, pts.count) {
+                let f = frameAt(pts, i)
+                let side: CGFloat = i % 2 == 0 ? 1 : -1
+                let cx = f.p.x + f.nx * f.p.w * 0.1 * side
+                let cy = f.p.y + f.ny * f.p.w * 0.1 * side
+                let half = max(3, f.p.w * 0.24)
+                let thin = max(1.6, f.p.w * 0.09)
+                ctx.move(to: CGPoint(x: cx + f.tx * half, y: cy + f.ty * half))
+                ctx.addLine(to: CGPoint(x: cx + f.nx * thin * side, y: cy + f.ny * thin * side))
+                ctx.addLine(to: CGPoint(x: cx - f.tx * half, y: cy - f.ty * half))
+                ctx.addLine(to: CGPoint(x: cx - f.nx * thin * side, y: cy - f.ny * thin * side))
+                ctx.closePath()
+                paint(ctx, plate)
+            }
+            for i in [pts.count - 3, pts.count - 2] where i > 0 {
+                let f = frameAt(pts, i)
+                for side: CGFloat in [1, -1] {
+                    let base = CGPoint(x: f.p.x + f.nx * f.p.w * 0.4 * side, y: f.p.y + f.ny * f.p.w * 0.4 * side)
+                    let tip = CGPoint(x: base.x + f.nx * 9 * side - f.tx * 4, y: base.y + f.ny * 9 * side - f.ty * 4)
+                    ctx.move(to: CGPoint(x: base.x + f.tx * 2, y: base.y + f.ty * 2))
+                    ctx.addLine(to: tip)
+                    ctx.addLine(to: CGPoint(x: base.x - f.tx * 2, y: base.y - f.ty * 2))
+                    ctx.closePath()
+                    paint(ctx, claw)
+                }
+            }
         case .blotches:
             for i in 1...5 where i < pts.count {
                 let f = frameAt(pts, i)

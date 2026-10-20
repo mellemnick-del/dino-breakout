@@ -1,13 +1,14 @@
 import SpriteKit
 
 enum DinoKind {
-    case compy, raptor, triceratops, rex, pterodactyl
+    case compy, raptor, triceratops, stegosaurus, rex, pterodactyl
 
     var name: String {
         switch self {
         case .compy: "Compy"
         case .raptor: "Raptor"
         case .triceratops: "Triceratops"
+        case .stegosaurus: "Stegosaurus"
         case .rex: "T-Rex"
         case .pterodactyl: "Pterodactyl"
         }
@@ -18,11 +19,17 @@ enum DinoKind {
         self == .pterodactyl
     }
 
+    /// Flat damage soaked from every hit. Weak, fast shots barely scratch armor.
+    var armor: CGFloat {
+        self == .stegosaurus ? 5 : 0
+    }
+
     var plural: String {
         switch self {
         case .compy: "compies"
         case .raptor: "raptors"
         case .triceratops: "triceratops"
+        case .stegosaurus: "stegosaurs"
         case .rex: "T-Rex"
         case .pterodactyl: "pterodactyls"
         }
@@ -33,6 +40,7 @@ enum DinoKind {
         case .compy: 18
         case .raptor: 40
         case .triceratops: 200
+        case .stegosaurus: 160
         case .rex: 1300
         case .pterodactyl: 32
         }
@@ -44,6 +52,7 @@ enum DinoKind {
         case .compy: 1.7
         case .raptor: 2.5
         case .triceratops: 0.85
+        case .stegosaurus: 0.75
         case .rex: 0.6
         case .pterodactyl: 1.5
         }
@@ -55,6 +64,7 @@ enum DinoKind {
         case .compy: 2
         case .raptor: 4
         case .triceratops: 12
+        case .stegosaurus: 11
         case .rex: 80
         case .pterodactyl: 5
         }
@@ -66,6 +76,7 @@ enum DinoKind {
         case .compy: 1
         case .raptor: 1
         case .triceratops: 2
+        case .stegosaurus: 2
         case .rex: 10
         case .pterodactyl: 1
         }
@@ -93,6 +104,8 @@ final class Dino: SKNode {
     var flight: Flight?
 
     private var slowFactor: CGFloat = 1
+    /// Daily challenge speed boost.
+    var speedScale: CGFloat = 1
     private var slowTimeLeft: TimeInterval = 0
     private var heading: CGFloat = -.pi / 2
     private let art: SKSpriteNode
@@ -168,7 +181,7 @@ final class Dino: SKNode {
 
     /// Cells per second right now, after tranquilizers.
     var currentSpeed: CGFloat {
-        kind.moveSpeed * slowFactor
+        kind.moveSpeed * slowFactor * speedScale
     }
 
     func tick(_ dt: TimeInterval) {

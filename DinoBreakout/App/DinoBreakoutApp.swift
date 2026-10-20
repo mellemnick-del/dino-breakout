@@ -16,6 +16,7 @@ struct GameSession: Identifiable {
     let level: Level
     let difficulty: Difficulty
     var endless = false
+    var challenge: DailyChallenge?
 }
 
 /// Shows the main menu, or a game once a park is picked.
@@ -33,6 +34,8 @@ struct RootView: View {
             } else {
                 MenuView { level, difficulty, endless in
                     session = GameSession(level: level, difficulty: difficulty, endless: endless)
+                } onDaily: { challenge in
+                    session = GameSession(level: challenge.level, difficulty: challenge.difficulty, challenge: challenge)
                 }
                 .transition(.opacity)
             }
@@ -65,7 +68,7 @@ struct GameView: View {
             }
             .onAppear {
                 guard scene == nil else { return }
-                let newScene = GameScene(size: geo.size, level: session.level, difficulty: session.difficulty, endless: session.endless)
+                let newScene = GameScene(size: geo.size, level: session.level, difficulty: session.difficulty, endless: session.endless, challenge: session.challenge)
                 newScene.scaleMode = .aspectFit
                 newScene.onExit = onExit
                 scene = newScene

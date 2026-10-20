@@ -14,6 +14,9 @@ The game opens on a title screen with dinos roaming the park behind it.
 
 - **Difficulty:** Easy (30 lives, $150), Medium (20 lives, $100), or Hard (10 lives, $80, tougher dinos, smaller bounties).
 - **Parks**, in unlock order: Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), Jungle River (a river with two bridges), Visitor Center (buildings to maze around), The Aviary (pterodactyls from wave 3), and Mount Ember (lava pools on volcanic ash). Each park unlocks when you reach wave 10 on the one before it, on any difficulty.
+- **Daily challenge:** the card at the top of the menu. Every date picks a park, difficulty, and twist (Sky Swarm, No Fences, Rich but Stingy, Fast Dinos, Five Lives, or Armored Up), the same on every device. Survive 20 waves to complete it.
+- **Achievements** (trophy button): 14 to earn, from First Bite to Never Off (wave 75 in endless). A banner pops up in game when you earn one.
+- **Test mode:** tap the big DINO title 7 times. Every park and endless mode unlock, you start with $9,999, and nothing counts toward stars, records, or achievements. Tap 7 more times to turn it off.
 - **Endless mode:** beat all 50 waves on a park (any difficulty) and its card gets an Endless button. Waves never stop: crowds grow until wave 60, then health keeps climbing, with a T-Rex boss wave every 10 (up to 6 T-Rexes) and pterodactyl flocks. You can also tap **Keep Going** on the victory screen to carry your towers straight into endless. Your endless record is saved per park and difficulty.
 - **Stars:** one at wave 10, two at wave 25, three for beating all 50, tracked per park and difficulty. Each card shows its stars and best wave, and the header shows your total.
 - **Settings** (gear): separate Music and Sound effects volume. All audio is synthesized in code (`Sound.swift`), and it follows the phone's silent switch.
@@ -50,6 +53,7 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 | Raptor | The fastest thing in the park |
 | Triceratops | Slow and very tough, costs 2 lives if it gets through |
 | T-Rex | Boss. Shakes the screen on arrival, costs 10 lives |
+| Stegosaurus | Armored: every hit loses 5 damage (always at least 1 gets through), so weak, fast shots barely scratch it. Upgrade your towers. Joins mixed waves from 13 and triceratops columns from 14 |
 | Pterodactyl | Flies straight over the maze from the gate to the chopper, weaving as it goes. Flak, turrets, and tranqs can hit it; flares can't. First flock on wave 11, then every third wave, a big flock on boss waves, and a few on most waves from 30 on |
 
 The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed.

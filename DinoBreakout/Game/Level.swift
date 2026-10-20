@@ -168,6 +168,13 @@ enum Progress {
     /// Wave you need to reach on a park to unlock the next one.
     static let unlockWave = 10
 
+    /// Hidden switch for playtesting: everything unlocked, lots of cash, nothing recorded.
+    static let testModeKey = "testMode"
+
+    static var testMode: Bool {
+        UserDefaults.standard.bool(forKey: testModeKey)
+    }
+
     /// One star at wave 10, two at wave 25, three for beating all 50.
     static func stars(forBest wave: Int) -> Int {
         if wave >= Waves.total { return 3 }
@@ -178,7 +185,7 @@ enum Progress {
 
     /// A park unlocks once you reach wave 10 on the park before it, on any difficulty.
     static func isUnlocked(_ level: Level) -> Bool {
-        guard let previous = level.previous else { return true }
+        guard !testMode, let previous = level.previous else { return true }
         return Difficulty.allCases.contains { best(level: previous, difficulty: $0) >= unlockWave }
     }
 
@@ -188,7 +195,7 @@ enum Progress {
 
     /// Beaten all 50 waves on this park, on any difficulty. Unlocks endless mode.
     static func hasBeaten(_ level: Level) -> Bool {
-        Difficulty.allCases.contains { best(level: level, difficulty: $0) >= Waves.total }
+        testMode || Difficulty.allCases.contains { best(level: level, difficulty: $0) >= Waves.total }
     }
 
     static func endlessBest(level: Level, difficulty: Difficulty) -> Int {
@@ -196,7 +203,7 @@ enum Progress {
     }
 
     static func recordEndless(wave: Int, level: Level, difficulty: Difficulty) {
-        guard wave > endlessBest(level: level, difficulty: difficulty) else { return }
+        guard !testMode, wave > endlessBest(level: level, difficulty: difficulty) else { return }
         UserDefaults.standard.set(wave, forKey: "endless-" + key(level, difficulty))
     }
 
@@ -205,7 +212,7 @@ enum Progress {
     }
 
     static func record(wave: Int, level: Level, difficulty: Difficulty) {
-        guard wave > best(level: level, difficulty: difficulty) else { return }
+        guard !testMode, wave > best(level: level, difficulty: difficulty) else { return }
         UserDefaults.standard.set(wave, forKey: key(level, difficulty))
     }
 

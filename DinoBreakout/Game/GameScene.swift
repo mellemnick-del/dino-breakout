@@ -31,6 +31,8 @@ final class GameScene: SKScene {
     let difficulty: Difficulty
     /// Whether this run started in endless mode from the menu.
     let startedEndless: Bool
+    /// Set when this run is today's daily challenge.
+    let challenge: DailyChallenge?
     /// Waves never run out. Also switches on when you keep going after wave 50.
     private var endless: Bool
     /// Called when the player leaves for the main menu.
@@ -79,6 +81,16 @@ final class GameScene: SKScene {
     private var gameSpeed = 1
     /// Where the chopper idles, so it can land again after a win.
     private var chopperHome: CGPoint = .zero
+    /// Lives when the current wave started, and whether it had a T-Rex, for Untouchable.
+    private var livesAtWaveStart = 0
+    private var waveHadRex = false
+    /// How many achievement pop-ups are showing, so they stack.
+    private var activeToasts = 0
+
+    /// Waves to win: 50, or 20 for the daily challenge.
+    private var waveGoal: Int {
+        challenge == nil ? Waves.total : DailyChallenge.waves
+    }
     /// Showing while the game is paused.
     private var pauseMenu: SKNode?
     /// Showing once the game is won or lost.
@@ -88,9 +100,10 @@ final class GameScene: SKScene {
     private weak var selectedTower: Tower?
     private var selectedRing: SKShapeNode?
 
-    init(size: CGSize, level: Level, difficulty: Difficulty, endless: Bool = false) {
+    init(size: CGSize, level: Level, difficulty: Difficulty, endless: Bool = false, challenge: DailyChallenge? = nil) {
         self.level = level
         self.difficulty = difficulty
+        self.challenge = challenge
         startedEndless = endless
         self.endless = endless
         grid = Grid(level: level)
@@ -149,20 +162,23 @@ final class GameScene: SKScene {
         drawBoard()
 
         // Bake every dino's walk cycle now so the first spawn doesn't hitch
-        for kind in [DinoKind.compy, .raptor, .triceratops, .rex, .pterodactyl] {
+        for kind in [DinoKind.compy, .raptor, .triceratops, .stegosaurus, .rex, .pterodactyl] {
             _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: screenScale)
         }
 
         hud = HUD(size: size, topHeight: topHeight, bottomHeight: bottomHeight)
         addChild(hud)
-        cash = difficulty.startingCash
-        lives = difficulty.lives
+        cash = Progress.testMode ? 9999 : (challenge?.startingCash ?? difficulty.startingCash)
+        lives = challenge?.lives ?? difficulty.lives
+        activeToasts = 0
         endless = startedEndless
-        hud.setWave(0, of: endless ? nil : Waves.total)
+        hud.setWave(0, of: endless ? nil : waveGoal)
         hud.setSendEnabled(true)
         tool = .build(.fence)
         hud.select(tool)
-        if endless {
+        if let challenge {
+            hud.flash("Daily challenge: \(challenge.twist.title). \(challenge.twist.detail)")
+        } else if endless {
             hud.flash("Endless \(level.name). How long can you hold the line?")
         } else {
             hud.flash("\(level.name) · \(difficulty.title). Build a maze, then tap Send Wave")
@@ -476,6 +492,10 @@ final class GameScene: SKScene {
             return
         }
 
+        if tool == .build(.fence), challenge?.allowsFences == false {
+            hud.flash("No fences today. Build your maze from towers")
+            return
+        }
         guard case .build(let kind)? = tool else {
             hud.flash("Pick something to build")
             return
@@ -520,6 +540,9 @@ final class GameScene: SKScene {
         towers[cell] = tower
         if kind == .fence {
             rebuildWires()
+            if towers.values.filter({ $0.kind == .fence }).count >= 40 {
+                award(.mazeMaster)
+            }
         } else {
             showRange(of: tower)
             hud.flash("Tap any tower to upgrade or sell it")
@@ -539,6 +562,9 @@ final class GameScene: SKScene {
         tower.upgrade()
         SoundBank.shared.play(.upgrade)
         hud.flash("\(tower.kind.title) level \(tower.level)")
+        if tower.level == Tower.maxLevel {
+            award(.fullyLoaded)
+        }
         showRange(of: tower)
     }
 
@@ -557,13 +583,16 @@ final class GameScene: SKScene {
     // MARK: - Waves
 
     private func sendWave() {
-        guard !waveActive, !isOver, endless || wavesStarted < Waves.total else { return }
-        let wave = Waves.groups(forWave: wavesStarted + 1, flyerHeavy: level.flyerHeavy)
+        guard !waveActive, !isOver, endless || wavesStarted < waveGoal else { return }
+        let flyerHeavy = level.flyerHeavy || challenge?.flyerHeavy == true
+        let wave = Waves.groups(forWave: wavesStarted + 1, flyerHeavy: flyerHeavy)
+        livesAtWaveStart = lives
+        waveHadRex = false
         wavesStarted += 1
         spawnQueue = Waves.schedule(wave)
         waveClock = 0
         waveActive = true
-        hud.setWave(wavesStarted, of: endless ? nil : Waves.total)
+        hud.setWave(wavesStarted, of: endless ? nil : waveGoal)
         hud.setSpeed(gameSpeed)
         setGate(open: true)
         SoundBank.shared.play(.alarm)
@@ -588,13 +617,17 @@ final class GameScene: SKScene {
     private func spawn(_ kind: DinoKind) {
         let dino = Dino(
             kind: kind,
-            healthScale: Waves.healthScale(forWave: wavesStarted - 1) * difficulty.health,
+            healthScale: Waves.healthScale(forWave: wavesStarted - 1) * difficulty.health * (challenge?.healthScale ?? 1),
             cell: grid.spawn,
             cellSize: cellSize,
             screenScale: screenScale
         )
         dino.target = grid.nextStep(from: grid.spawn) ?? grid.spawn
         dino.position = point(for: grid.spawn)
+        dino.speedScale = challenge?.speedScale ?? 1
+        if kind == .rex {
+            waveHadRex = true
+        }
         world.addChild(dino)
         dinos.append(dino)
 
@@ -618,15 +651,31 @@ final class GameScene: SKScene {
         guard waveActive, spawnQueue.isEmpty, dinos.isEmpty else { return }
         waveActive = false
         setGate(open: false)
-        if wavesStarted <= Waves.total {
-            Progress.record(wave: wavesStarted, level: level, difficulty: difficulty)
+        if let challenge {
+            challenge.record(wave: wavesStarted)
+        } else {
+            if wavesStarted <= Waves.total {
+                Progress.record(wave: wavesStarted, level: level, difficulty: difficulty)
+            }
+            if endless {
+                Progress.recordEndless(wave: wavesStarted, level: level, difficulty: difficulty)
+            }
+            if wavesStarted >= 10 {
+                award(.holdingTheLine)
+            }
+            if endless && wavesStarted >= 75 {
+                award(.neverOff)
+            }
         }
-        if endless {
-            Progress.recordEndless(wave: wavesStarted, level: level, difficulty: difficulty)
+        if waveHadRex && lives == livesAtWaveStart {
+            award(.untouchable)
+        }
+        if gameSpeed == 3 {
+            award(.fastForward)
         }
         let bonus = 8 + 2 * min(wavesStarted, Waves.total)
         cash += bonus
-        if !endless && wavesStarted == Waves.total {
+        if !endless && wavesStarted == waveGoal {
             endGame(won: true)
         } else {
             hud.setSendEnabled(true)
@@ -826,13 +875,26 @@ final class GameScene: SKScene {
         if let slow {
             dino.slow(to: slow.factor, for: slow.duration)
         }
-        if dino.takeDamage(amount) {
+        // Armor soaks a flat amount from every hit, but something always gets through
+        let dealt = max(1, amount - dino.kind.armor)
+        if dino.takeDamage(dealt) {
             kill(dino)
         }
     }
 
     private func kill(_ dino: Dino) {
-        let scale = Waves.rewardScale(forWave: max(0, wavesStarted - 1)) * difficulty.bounty
+        award(.firstBite)
+        switch dino.kind {
+        case .rex:
+            if Achievements.tally(Achievements.rexKills) >= 10 { award(.rexWrangler) }
+        case .pterodactyl:
+            if Achievements.tally(Achievements.pteroKills) >= 100 { award(.flakAce) }
+        case .stegosaurus:
+            if Achievements.tally(Achievements.stegoKills) >= 25 { award(.plateBreaker) }
+        default:
+            break
+        }
+        let scale = Waves.rewardScale(forWave: max(0, wavesStarted - 1)) * difficulty.bounty * (challenge?.bountyScale ?? 1)
         let reward = max(1, Int((CGFloat(dino.kind.reward) * scale).rounded()))
         cash += reward
         floatText("+$\(reward)", at: dino.position)
@@ -862,9 +924,29 @@ final class GameScene: SKScene {
         overlay.zPosition = 100
         addChild(overlay)
 
+        if won {
+            if challenge != nil {
+                award(.dailyDriver)
+            } else {
+                award(.evacuationComplete)
+                if difficulty == .hard {
+                    award(.hardTarget)
+                }
+                if Level.all.allSatisfy({ Progress.hasBeaten($0) }) {
+                    award(.parkRanger)
+                }
+            }
+        }
+
         let endlessBest = Progress.endlessBest(level: level, difficulty: difficulty)
+        let titleText: String
+        if challenge != nil {
+            titleText = won ? "CHALLENGE COMPLETE" : "CHALLENGE FAILED"
+        } else {
+            titleText = won ? "EVACUATION COMPLETE" : (endless ? "ENDLESS RUN OVER" : "PARK LOST")
+        }
         let title = makeLabel(
-            won ? "EVACUATION COMPLETE" : (endless ? "ENDLESS RUN OVER" : "PARK LOST"),
+            titleText,
             size: 28,
             font: Fonts.heavy,
             color: won ? Palette.warning : Palette.danger
@@ -873,7 +955,11 @@ final class GameScene: SKScene {
         overlay.addChild(title)
 
         let detailText: String
-        if won {
+        if let challenge {
+            detailText = won
+                ? "You survived all \(DailyChallenge.waves) waves of today's challenge."
+                : "You reached wave \(wavesStarted) of \(DailyChallenge.waves). Best today: wave \(challenge.best)."
+        } else if won {
             detailText = "Everyone made it out of \(level.name). \(lives) lives left."
         } else if endless {
             detailText = "You held to wave \(wavesStarted). Endless record: wave \(max(endlessBest, wavesStarted))."
@@ -884,7 +970,7 @@ final class GameScene: SKScene {
         detail.position = CGPoint(x: 0, y: -8)
         overlay.addChild(detail)
 
-        if won {
+        if won && challenge == nil {
             overlay.addChild(menuButton("Keep Going ∞", name: "endless", fill: Palette.warning, text: Palette.bar, outlined: false, y: -60))
             overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.panel, text: Palette.text, outlined: true, y: -120))
             overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -180))
@@ -897,6 +983,58 @@ final class GameScene: SKScene {
 
         overlay.alpha = 0
         overlay.run(.sequence([.wait(forDuration: won ? 1.2 : 0), .fadeIn(withDuration: 0.3)]))
+    }
+
+    // MARK: - Achievements
+
+    private func award(_ achievement: Achievement) {
+        guard Achievements.earn(achievement) else { return }
+        showAchievement(achievement)
+    }
+
+    /// Slides a trophy banner in under the top bar for a few seconds.
+    private func showAchievement(_ achievement: Achievement) {
+        let width = min(size.width - 24, 320)
+        let toast = SKNode()
+        toast.zPosition = 95
+        let y = size.height - topHeight - 40 - CGFloat(activeToasts) * 62
+        toast.position = CGPoint(x: size.width / 2, y: y + 30)
+        toast.alpha = 0
+        activeToasts += 1
+
+        let background = SKShapeNode(rectOf: CGSize(width: width, height: 54), cornerRadius: 14)
+        background.fillColor = Palette.bar.withAlphaComponent(0.96)
+        background.strokeColor = Palette.warning
+        background.lineWidth = 2
+        toast.addChild(background)
+
+        let badge = SKShapeNode(circleOfRadius: 17)
+        badge.fillColor = Palette.warning
+        badge.strokeColor = .clear
+        badge.position = CGPoint(x: -width / 2 + 30, y: 0)
+        toast.addChild(badge)
+        let trophy = makeLabel("★", size: 20, font: Fonts.heavy, color: Palette.bar)
+        trophy.position = badge.position
+        toast.addChild(trophy)
+
+        let heading = makeLabel("ACHIEVEMENT UNLOCKED", size: 10, font: Fonts.heavy, color: Palette.warning)
+        heading.horizontalAlignmentMode = .left
+        heading.position = CGPoint(x: -width / 2 + 56, y: 10)
+        toast.addChild(heading)
+        let name = makeLabel(achievement.title, size: 17, font: Fonts.heavy)
+        name.horizontalAlignmentMode = .left
+        name.position = CGPoint(x: -width / 2 + 56, y: -9)
+        toast.addChild(name)
+
+        addChild(toast)
+        SoundBank.shared.play(.upgrade)
+        toast.run(.sequence([
+            .group([.fadeIn(withDuration: 0.25), .moveTo(y: y, duration: 0.25)]),
+            .wait(forDuration: 2.6),
+            .fadeOut(withDuration: 0.4),
+            .run { [weak self] in self?.activeToasts = max(0, (self?.activeToasts ?? 1) - 1) },
+            .removeFromParent()
+        ]))
     }
 
     /// After winning, bring the chopper back down and keep the waves coming.
@@ -1022,7 +1160,7 @@ final class GameScene: SKScene {
         title.position = CGPoint(x: 0, y: 96)
         menu.addChild(title)
 
-        let waveText = endless ? "Wave \(wavesStarted) ∞" : "Wave \(wavesStarted) of \(Waves.total)"
+        let waveText = endless ? "Wave \(wavesStarted) ∞" : "Wave \(wavesStarted) of \(waveGoal)"
         let status = makeLabel("\(waveText)  ·  \(lives) lives  ·  $\(cash)", size: 14, color: Palette.muted)
         status.position = CGPoint(x: 0, y: 64)
         menu.addChild(status)

@@ -22,9 +22,13 @@ enum MenuColor {
 struct MenuView: View {
     /// Park, difficulty, and whether it's an endless run.
     let onPlay: (Level, Difficulty, Bool) -> Void
+    let onDaily: (DailyChallenge) -> Void
 
     @AppStorage("difficulty") private var difficultyRaw = Difficulty.medium.rawValue
+    @AppStorage(Progress.testModeKey) private var testMode = false
     @State private var showSettings = false
+    @State private var showTrophies = false
+    @State private var titleTaps = 0
 
     private var difficulty: Difficulty {
         Difficulty(rawValue: difficultyRaw) ?? .medium
@@ -44,6 +48,7 @@ struct MenuView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     header
+                    dailyCard
                     difficultyPicker
                     parks
                 }
@@ -54,6 +59,9 @@ struct MenuView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showTrophies) {
+            TrophyRoom()
         }
     }
 
@@ -70,6 +78,25 @@ struct MenuView: View {
                         .foregroundStyle(MenuColor.hazard)
                 }
                 Spacer()
+                if testMode {
+                    Text("TEST MODE")
+                        .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(MenuColor.hazardInk)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(red: 0.89, green: 0.35, blue: 0.25), in: Capsule())
+                }
+                Button {
+                    showTrophies = true
+                } label: {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(MenuColor.hazard)
+                        .frame(width: 42, height: 42)
+                        .background(MenuColor.panel.opacity(0.9), in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(MenuColor.line))
+                }
+                .accessibilityLabel("Achievements")
                 Button {
                     showSettings = true
                 } label: {
@@ -87,6 +114,14 @@ struct MenuView: View {
             Text("DINO")
                 .font(.system(size: 68, weight: .black, design: .rounded))
                 .foregroundStyle(MenuColor.text)
+                .onTapGesture {
+                    // Seven taps on the title flips the hidden test mode
+                    titleTaps += 1
+                    if titleTaps >= 7 {
+                        titleTaps = 0
+                        testMode.toggle()
+                    }
+                }
             Text("BREAKOUT")
                 .font(.system(size: 52, weight: .black, design: .rounded))
                 .foregroundStyle(MenuColor.hazard)
@@ -97,6 +132,51 @@ struct MenuView: View {
                 .padding(.top, 2)
         }
         .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
+    }
+
+    private var dailyCard: some View {
+        let daily = DailyChallenge.today
+        return Button {
+            onDaily(daily)
+        } label: {
+            HStack(spacing: 14) {
+                VStack(spacing: 0) {
+                    Image(systemName: daily.isComplete ? "checkmark.seal.fill" : "calendar")
+                        .font(.system(size: 22, weight: .bold))
+                    Text(daily.displayDate.uppercased())
+                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                        .padding(.top, 4)
+                }
+                .foregroundStyle(MenuColor.hazardInk)
+                .frame(width: 62, height: 62)
+                .background(MenuColor.hazard, in: RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("DAILY CHALLENGE")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .tracking(1.2)
+                        .foregroundStyle(MenuColor.hazard)
+                    Text("\(daily.twist.title) · \(daily.level.name)")
+                        .font(.system(size: 18, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MenuColor.text)
+                    Text("\(daily.twist.detail) \(daily.difficulty.title), survive \(DailyChallenge.waves) waves.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(MenuColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(daily.isComplete ? "Completed today" : (daily.best > 0 ? "Best today: wave \(daily.best)" : "New challenge every day"))
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(daily.isComplete ? MenuColor.hazard : MenuColor.muted)
+                        .padding(.top, 2)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(MenuColor.panel.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(MenuColor.hazard.opacity(0.6), lineWidth: 1.5))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Starts today's daily challenge")
     }
 
     private var difficultyPicker: some View {
@@ -338,6 +418,61 @@ struct HazardStripes: View {
                 x += size.height
             }
         }
+    }
+}
+
+/// Every achievement, earned or not.
+struct TrophyRoom: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(Achievement.allCases) { achievement in
+                        let earned = Achievements.isEarned(achievement)
+                        HStack(spacing: 14) {
+                            Image(systemName: achievement.symbol)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(earned ? MenuColor.hazardInk : MenuColor.muted)
+                                .frame(width: 42, height: 42)
+                                .background(earned ? MenuColor.hazard : MenuColor.panel, in: RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(achievement.title)
+                                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(earned ? .primary : .secondary)
+                                Text(achievement.detail)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if earned {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(MenuColor.hazard)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityValue(earned ? "Earned" : "Not earned")
+                    }
+                } header: {
+                    Text("\(Achievements.earnedCount) of \(Achievement.allCases.count) earned")
+                } footer: {
+                    if Progress.testMode {
+                        Text("Test mode is on, so nothing can be earned right now.")
+                    }
+                }
+            }
+            .navigationTitle("Achievements")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .tint(MenuColor.hazard)
     }
 }
 

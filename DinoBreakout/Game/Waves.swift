@@ -96,16 +96,25 @@ enum Waves {
                 SpawnGroup(kind: .compy, count: n(12), every: every(0.3), startAt: 6)
             ]
         case 2:
-            return [
+            // Armored columns: stegosaurs join the triceratops from wave 14
+            var column = [
                 SpawnGroup(kind: .triceratops, count: n(10), every: every(1.4)),
                 SpawnGroup(kind: .raptor, count: n(10), every: every(0.6), startAt: 4)
             ]
+            if number >= 14 {
+                column.append(SpawnGroup(kind: .stegosaurus, count: n(5), every: every(1.6), startAt: 2))
+            }
+            return column
         default:
-            return [
+            var mixed = [
                 SpawnGroup(kind: .compy, count: n(16), every: every(0.3)),
                 SpawnGroup(kind: .raptor, count: n(12), every: every(0.5), startAt: 3),
                 SpawnGroup(kind: .triceratops, count: n(5), every: every(1.6), startAt: 6)
             ]
+            if number >= 13 {
+                mixed.append(SpawnGroup(kind: .stegosaurus, count: n(3), every: every(1.8), startAt: 8))
+            }
+            return mixed
         }
     }
 
