@@ -40,19 +40,20 @@ Emoji are placeholder art so we can tune gameplay before drawing sprites.
 
 ## Run it on your Mac
 
-1. Install XcodeGen if you don't have it: `brew install xcodegen`
-2. Clone the repo, then from the repo root:
-   ```bash
-   xcodegen generate
-   open DinoBreakout.xcodeproj
-   ```
-3. Pick an iPhone simulator and press **Cmd + R**.
-4. To play on your own iPhone: select the DinoBreakout target, go to **Signing & Capabilities**, and choose your Apple ID team.
+No terminal needed. Requires Xcode 16 or newer.
+
+1. Open Xcode. On the welcome window, choose **Clone Git Repository** (or **Integrate > Clone** from the menu bar).
+2. Paste `https://github.com/mellemnick-del/dino-breakout.git`, pick where to save it, and click **Clone**. Xcode opens the project.
+3. Pick an iPhone simulator at the top and press **Cmd + R**.
+4. To play on your own iPhone: click the blue DinoBreakout project icon at the top of the file list, select the DinoBreakout target, go to **Signing & Capabilities**, and choose your Apple ID team.
+
+To get new changes later: **Integrate > Pull**.
 
 ## Tech
 
 - Swift, SpriteKit, and a thin SwiftUI wrapper. iOS 17 and up, iPhone, portrait.
 - Zero third party dependencies.
+- The `DinoBreakout` folder is a synced folder in Xcode, so any new Swift file dropped in it is part of the build automatically.
 
 ```
 DinoBreakout/
