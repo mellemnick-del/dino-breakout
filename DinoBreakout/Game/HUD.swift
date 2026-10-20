@@ -34,6 +34,7 @@ enum Tool: Equatable {
 }
 
 enum HUDAction {
+    case pause
     case sendWave
     case pick(Tool)
 }
@@ -42,8 +43,9 @@ enum HUDAction {
 final class HUD: SKNode {
     private let livesLabel = makeLabel("", size: 16, font: Fonts.heavy)
     private let cashLabel = makeLabel("", size: 16, font: Fonts.heavy)
-    private let waveLabel = makeLabel("", size: 16, font: Fonts.heavy)
-    private let sendButton = SKShapeNode(rectOf: CGSize(width: 118, height: 38), cornerRadius: 10)
+    private let waveLabel = makeLabel("", size: 14, font: Fonts.heavy)
+    private let sendButton = SKShapeNode(rectOf: CGSize(width: 104, height: 38), cornerRadius: 10)
+    private let pauseButton = SKShapeNode(rectOf: CGSize(width: 32, height: 32), cornerRadius: 8)
     private let sendLabel = makeLabel("Send Wave", size: 15, font: Fonts.heavy, color: Palette.bar)
     private let message = makeLabel("", size: 15, font: Fonts.heavy, color: Palette.warning)
     private var toolButtons: [(tool: Tool, node: SKShapeNode)] = []
@@ -58,13 +60,29 @@ final class HUD: SKNode {
         addChild(top)
 
         let midY = size.height - topHeight / 2
-        for (label, x) in [(livesLabel, 14.0), (cashLabel, 76.0), (waveLabel, 152.0)] {
+        pauseButton.position = CGPoint(x: 28, y: midY)
+        pauseButton.fillColor = Palette.panel
+        pauseButton.strokeColor = SKColor(white: 1, alpha: 0.15)
+        for x: CGFloat in [-4.5, 4.5] {
+            let bar = SKSpriteNode(color: Palette.text, size: CGSize(width: 4, height: 14))
+            bar.position = CGPoint(x: x, y: 0)
+            pauseButton.addChild(bar)
+        }
+        addChild(pauseButton)
+
+        let heart = SKSpriteNode(texture: ParkArt.heart(size: 20), size: CGSize(width: 20, height: 20))
+        heart.position = CGPoint(x: 62, y: midY)
+        addChild(heart)
+        let coin = SKSpriteNode(texture: ParkArt.coinIcon(size: 20), size: CGSize(width: 20, height: 20))
+        coin.position = CGPoint(x: 112, y: midY)
+        addChild(coin)
+        for (label, x) in [(livesLabel, 74.0), (cashLabel, 124.0), (waveLabel, 172.0)] {
             label.horizontalAlignmentMode = .left
             label.position = CGPoint(x: x, y: midY)
             addChild(label)
         }
 
-        sendButton.position = CGPoint(x: size.width - 14 - 59, y: midY)
+        sendButton.position = CGPoint(x: size.width - 12 - 52, y: midY)
         sendButton.lineWidth = 0
         sendButton.addChild(sendLabel)
         addChild(sendButton)
@@ -87,26 +105,23 @@ final class HUD: SKNode {
             button.fillColor = Palette.panel
             button.position = CGPoint(x: pad + width / 2 + CGFloat(i) * (width + gap), y: 8 + height / 2)
 
-            let icon: String
             let title: String
             let price: String
             switch tool {
             case .build(let kind):
-                icon = kind.icon
                 title = kind.title
                 price = "$\(kind.cost)"
             case .sell:
-                icon = "💲"
                 title = "Sell"
                 price = "70%"
             }
-            let iconLabel = makeLabel(icon, size: 22)
-            iconLabel.position = CGPoint(x: 0, y: 12)
+            let iconSprite = SKSpriteNode(texture: ParkArt.icon(for: tool, size: 34), size: CGSize(width: 34, height: 34))
+            iconSprite.position = CGPoint(x: 0, y: 14)
             let titleLabel = makeLabel(title, size: 12)
             titleLabel.position = CGPoint(x: 0, y: -10)
             let priceLabel = makeLabel(price, size: 11, color: Palette.warning)
             priceLabel.position = CGPoint(x: 0, y: -24)
-            button.addChild(iconLabel)
+            button.addChild(iconSprite)
             button.addChild(titleLabel)
             button.addChild(priceLabel)
 
@@ -120,11 +135,11 @@ final class HUD: SKNode {
     }
 
     func setLives(_ lives: Int) {
-        livesLabel.text = "❤️ \(lives)"
+        livesLabel.text = "\(lives)"
     }
 
     func setCash(_ cash: Int) {
-        cashLabel.text = "💰 \(cash)"
+        cashLabel.text = "\(cash)"
     }
 
     func setWave(_ wave: Int, of total: Int) {
@@ -154,6 +169,9 @@ final class HUD: SKNode {
 
     /// Which control, if any, sits under a point in scene coordinates.
     func action(at point: CGPoint) -> HUDAction? {
+        if pauseButton.contains(point) {
+            return .pause
+        }
         if sendButton.contains(point) {
             return .sendWave
         }

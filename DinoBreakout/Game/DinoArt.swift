@@ -100,7 +100,7 @@ extension DinoKind {
                 ],
                 arms: [DinoArm(x: -5, spread: 7.5, rx: 2.8, ry: 1.8)],
                 head: .theropod(length: 16, widths: [10, 12, 11, 8, 5], teeth: 0, brow: false),
-                marks: .spots, cells: 0.62
+                marks: .spots, cells: 0.8
             )
         case .raptor:
             DinoStyle(
@@ -113,7 +113,7 @@ extension DinoKind {
                 ],
                 arms: [DinoArm(x: -6, spread: 12, rx: 5, ry: 2.6)],
                 head: .theropod(length: 28, widths: [15, 19, 17, 12, 7], teeth: 4, brow: true),
-                marks: .stripes, cells: 1.0
+                marks: .stripes, cells: 1.3
             )
         case .triceratops:
             DinoStyle(
@@ -129,7 +129,7 @@ extension DinoKind {
                 ],
                 arms: [],
                 head: .trike(length: 36),
-                marks: .blotches, cells: 1.45
+                marks: .blotches, cells: 1.75
             )
         case .rex:
             DinoStyle(
@@ -142,7 +142,7 @@ extension DinoKind {
                 ],
                 arms: [DinoArm(x: -12, spread: 23, rx: 6, ry: 3.5)],
                 head: .theropod(length: 50, widths: [32, 40, 38, 30, 20], teeth: 7, brow: true),
-                marks: .ridge, cells: 1.85
+                marks: .ridge, cells: 2.25
             )
         }
     }

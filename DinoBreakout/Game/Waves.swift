@@ -10,7 +10,10 @@ struct SpawnGroup {
 }
 
 enum Waves {
-    static let all: [[SpawnGroup]] = [
+    static let total = 50
+
+    /// The first ten waves, hand built to teach each dino.
+    private static let opening: [[SpawnGroup]] = [
         [SpawnGroup(kind: .compy, count: 12, every: 0.8)],
         [SpawnGroup(kind: .compy, count: 20, every: 0.5)],
         [
@@ -46,10 +49,61 @@ enum Waves {
         ]
     ]
 
-    /// Dinos get tougher every wave, ramping up harder late. `index` is zero based.
+    /// The lineup for a wave, numbered from 1. After the opening ten, waves
+    /// rotate through swarms, raptor rushes, triceratops columns, and mixed
+    /// packs, growing as they go. Every tenth wave is a T-Rex boss wave.
+    static func groups(forWave number: Int) -> [SpawnGroup] {
+        if number <= opening.count {
+            return opening[max(0, number - 1)]
+        }
+        let growth = 1 + CGFloat(number - 10) * 0.04
+        func n(_ base: Int) -> Int { Int((CGFloat(base) * growth).rounded()) }
+        let pace = max(0.6, 1 - CGFloat(number - 10) * 0.01)
+        func every(_ base: TimeInterval) -> TimeInterval { base * TimeInterval(pace) }
+
+        if number % 10 == 0 {
+            let rexes = number / 10
+            return [
+                SpawnGroup(kind: .raptor, count: n(10), every: every(0.6)),
+                SpawnGroup(kind: .triceratops, count: n(5), every: every(1.8), startAt: 3),
+                SpawnGroup(kind: .rex, count: rexes, every: 6, startAt: 10),
+                SpawnGroup(kind: .compy, count: n(20), every: every(0.25), startAt: 12)
+            ]
+        }
+        switch number % 4 {
+        case 0:
+            return [
+                SpawnGroup(kind: .compy, count: n(36), every: every(0.22)),
+                SpawnGroup(kind: .raptor, count: n(8), every: every(0.6), startAt: 5)
+            ]
+        case 1:
+            return [
+                SpawnGroup(kind: .raptor, count: n(20), every: every(0.45)),
+                SpawnGroup(kind: .compy, count: n(12), every: every(0.3), startAt: 6)
+            ]
+        case 2:
+            return [
+                SpawnGroup(kind: .triceratops, count: n(10), every: every(1.4)),
+                SpawnGroup(kind: .raptor, count: n(10), every: every(0.6), startAt: 4)
+            ]
+        default:
+            return [
+                SpawnGroup(kind: .compy, count: n(16), every: every(0.3)),
+                SpawnGroup(kind: .raptor, count: n(12), every: every(0.5), startAt: 3),
+                SpawnGroup(kind: .triceratops, count: n(5), every: every(1.6), startAt: 6)
+            ]
+        }
+    }
+
+    /// Dinos get tougher every wave. `index` is zero based.
     static func healthScale(forWave index: Int) -> CGFloat {
         let i = CGFloat(index)
-        return 1 + 0.16 * i + 0.012 * i * i
+        return 1 + 0.14 * i + 0.003 * i * i
+    }
+
+    /// Bounties grow too, so the economy keeps up with the dinos.
+    static func rewardScale(forWave index: Int) -> CGFloat {
+        1 + 0.04 * CGFloat(index)
     }
 
     /// Flattens a wave into spawn times, earliest first.

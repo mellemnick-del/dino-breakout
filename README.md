@@ -16,7 +16,8 @@ A mazing tower defense game for iPhone. The park's power has failed and the dino
 - Tap a tower you already built to **upgrade** it (up to level 3, shown by the yellow dots).
 - Pick **Sell** and tap a tower to get 70% of what you spent back.
 - Tap **Send Wave** when your maze is ready. Clearing a wave pays a bonus.
-- Survive 10 waves to win. Wave 10 ends with a T-Rex.
+- Survive 50 waves to win. Every tenth wave is a T-Rex boss wave, with one more T-Rex each time.
+- Tap the pause button (top left) to pause, resume, or restart from wave 1.
 
 ### Build bar
 
@@ -36,7 +37,9 @@ A mazing tower defense game for iPhone. The park's power has failed and the dino
 | Triceratops | Slow and very tough, costs 2 lives if it gets through |
 | T-Rex | Boss. Shakes the screen on arrival, costs 10 lives |
 
-The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed. Towers, fences, and the ground are still placeholder art.
+The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed.
+
+Everything else on the board is drawn the same way (`ParkArt.swift`): towers on concrete pads with rank chevrons for their level, electric fences that wire themselves to neighboring fences, the paddock gate whose doors swing open during a wave, the rescue chopper idling on the helipad (it lifts off when you win), dirt trails that wear in where dinos run, darts, tracers, flare bursts, and fence sparks.
 
 ## Run it on your Mac
 
@@ -64,13 +67,14 @@ DinoBreakout/
     Dino.swift        Dino types, stats, and the dino node
     DinoArt.swift     Dino colors and shapes, and the walk cycle renderer
     Tower.swift       Build pieces, stats, and upgrades
-    Waves.swift       The 10 waves and difficulty scaling
+    Waves.swift       The 50 waves and difficulty scaling
+    ParkArt.swift     Towers, fences, gate, helipad, ground, and effects art
     HUD.swift         Top bar, build bar, colors, fonts
 ```
 
 ### How the pathfinding works
 
-`Grid` keeps a distance map: for every square, how many steps it is to the helipad. Each dino just steps to whichever neighbor is closest. When you place or sell something, the map is rebuilt (a breadth first search, instant on a 9 x 13 board), and every dino reroutes on its next step. Placements are only allowed if the paddock gate, and every square a dino is standing on or heading to, can still reach the helipad.
+`Grid` keeps a distance map: for every square, how many steps it is to the helipad. Each dino just steps to whichever neighbor is closest. When you place or sell something, the map is rebuilt (a breadth first search, instant on a 7 x 11 board), and every dino reroutes on its next step. Placements are only allowed if the paddock gate, and every square a dino is standing on or heading to, can still reach the helipad.
 
 ### Tuning
 
@@ -85,7 +89,6 @@ All the numbers live in a few obvious places:
 ## Roadmap
 
 Next up:
-- Real art: top-down dino sprites, fence posts, tower models, jungle tiles
 - Sound: footsteps, tranq pops, fence hum, the T-Rex roar
 - Pteranodons that fly over the maze (and an anti-air tower)
 - Raptors that test fences for weak spots, triceratops that smash through them

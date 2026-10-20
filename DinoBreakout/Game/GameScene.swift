@@ -2,13 +2,13 @@ import SpriteKit
 
 /// A dart or bullet in flight. Homes in on its target.
 private final class Shot {
-    let node: SKShapeNode
+    let node: SKSpriteNode
     let target: Dino
     let damage: CGFloat
     let slow: (factor: CGFloat, duration: TimeInterval)?
     var done = false
 
-    init(node: SKShapeNode, target: Dino, damage: CGFloat, slow: (factor: CGFloat, duration: TimeInterval)?) {
+    init(node: SKSpriteNode, target: Dino, damage: CGFloat, slow: (factor: CGFloat, duration: TimeInterval)?) {
         self.node = node
         self.target = target
         self.damage = damage
@@ -19,8 +19,8 @@ private final class Shot {
 final class GameScene: SKScene {
     // MARK: Tuning
 
-    private let cols = 9
-    private let rows = 13
+    private let cols = 7
+    private let rows = 11
     private let startingCash = 100
     private let startingLives = 20
     private let topHeight: CGFloat = 60
@@ -28,7 +28,7 @@ final class GameScene: SKScene {
 
     // MARK: State
 
-    private var grid = Grid(cols: 9, rows: 13)
+    private var grid = Grid(cols: 7, rows: 11)
     private var cellSize: CGFloat = 40
     private var origin: CGPoint = .zero
 
@@ -55,9 +55,21 @@ final class GameScene: SKScene {
     private var isOver = false
     private var screenScale: CGFloat = 3
 
+    /// Live wires between neighboring fences, rebuilt when fences change.
+    private let wireLayer = SKNode()
+    /// How many dino steps each square has taken, and the dirt worn into it.
+    private var wear: [Cell: Int] = [:]
+    private var dirt: [Cell: SKSpriteNode] = [:]
+    private var gateDoors: [(door: SKSpriteNode, closed: CGFloat, open: CGFloat)] = []
+    private var chopper: SKNode?
+    private var sparkTimer: TimeInterval = 1
+    /// Showing while the game is paused.
+    private var pauseMenu: SKNode?
+
     override func didMove(to view: SKView) {
         backgroundColor = Palette.bar
         screenScale = view.contentScaleFactor
+        ParkArt.screenScale = screenScale
         startNewGame()
     }
 
@@ -78,6 +90,13 @@ final class GameScene: SKScene {
         waveActive = false
         spawnQueue = []
         isOver = false
+        wear = [:]
+        dirt = [:]
+        gateDoors = []
+        wireLayer.removeAllChildren()
+        wireLayer.removeAllActions()
+        pauseMenu = nil
+        world.isPaused = false
 
         let available = size.height - topHeight - bottomHeight
         cellSize = floor(min(size.width / CGFloat(cols), available / CGFloat(rows)))
@@ -96,7 +115,7 @@ final class GameScene: SKScene {
         addChild(hud)
         cash = startingCash
         lives = startingLives
-        hud.setWave(0, of: Waves.all.count)
+        hud.setWave(0, of: Waves.total)
         hud.setSendEnabled(true)
         tool = .build(.fence)
         hud.select(tool)
@@ -104,33 +123,168 @@ final class GameScene: SKScene {
     }
 
     private func drawBoard() {
-        let tileSize = CGSize(width: cellSize, height: cellSize)
-        for row in 0..<rows {
-            for col in 0..<cols {
-                let cell = Cell(col: col, row: row)
-                let color: SKColor
-                if cell == grid.spawn {
-                    color = Palette.gate
-                } else if cell == grid.exit {
-                    color = Palette.pad
-                } else {
-                    color = (row + col).isMultiple(of: 2) ? Palette.groundA : Palette.groundB
-                }
-                let tile = SKSpriteNode(color: color, size: tileSize)
-                tile.position = point(for: cell)
-                world.addChild(tile)
-            }
+        let boardSize = CGSize(width: cellSize * CGFloat(cols), height: cellSize * CGFloat(rows))
+        let ground = SKSpriteNode(texture: ParkArt.ground(cols: cols, rows: rows, cell: cellSize), size: boardSize)
+        ground.anchorPoint = .zero
+        ground.position = origin
+        world.addChild(ground)
+
+        wireLayer.zPosition = 2.5
+        world.addChild(wireLayer)
+        wireLayer.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.8, duration: 0.5),
+            .fadeAlpha(to: 1, duration: 0.5)
+        ])))
+
+        buildGate()
+        buildHelipad()
+    }
+
+    /// Steel paddock gate on the spawn square. Doors swing open while a wave is on.
+    private func buildGate() {
+        let gate = SKNode()
+        gate.position = point(for: grid.spawn)
+        gate.zPosition = 2
+        world.addChild(gate)
+        let c = cellSize
+        gate.addChild(SKSpriteNode(texture: ParkArt.gateBase(cell: c), size: CGSize(width: c, height: c)))
+
+        let doorSize = CGSize(width: c * ParkArt.doorLength, height: c * 0.12)
+        let hinges: [(x: CGFloat, closed: CGFloat, open: CGFloat)] = [
+            (-c * 0.33, 0, -1.35),
+            (c * 0.33, .pi, .pi + 1.35)
+        ]
+        for hinge in hinges {
+            let door = SKSpriteNode(texture: ParkArt.gateDoor(cell: c), size: doorSize)
+            door.anchorPoint = CGPoint(x: 0, y: 0.5)
+            door.position = CGPoint(x: hinge.x, y: c * 0.3)
+            door.zRotation = hinge.closed
+            door.zPosition = 1
+            gate.addChild(door)
+            gateDoors.append((door, hinge.closed, hinge.open))
         }
 
-        let gate = makeLabel("🚧", size: cellSize * 0.6)
-        gate.position = point(for: grid.spawn)
-        gate.zPosition = 1
-        world.addChild(gate)
+        let red = UIColor(hex: 0xFF5A3A)
+        let dim = UIColor(hex: 0x7A2418)
+        let on = ParkArt.light(cell: c, color: red, dim: dim, on: true, radius: 0.055)
+        let off = ParkArt.light(cell: c, color: red, dim: dim, on: false, radius: 0.055)
+        let lightSize = CGSize(width: c * 0.055 * 4.6, height: c * 0.055 * 4.6)
+        for (i, x) in [-c * 0.42, c * 0.42].enumerated() {
+            let light = SKSpriteNode(texture: off, size: lightSize)
+            light.position = CGPoint(x: x, y: c * 0.3)
+            light.zPosition = 2
+            gate.addChild(light)
+            let blink = SKAction.repeatForever(.animate(with: i == 0 ? [on, off] : [off, on], timePerFrame: 0.4))
+            light.run(blink)
+        }
+    }
 
-        let pad = makeLabel("🚁", size: cellSize * 0.6)
+    private func setGate(open: Bool) {
+        for (door, closed, opened) in gateDoors {
+            door.removeAllActions()
+            let action = SKAction.rotate(toAngle: open ? opened : closed, duration: 0.5, shortestUnitArc: true)
+            action.timingMode = .easeInEaseOut
+            door.run(action)
+        }
+    }
+
+    /// Helipad on the exit square with the rescue chopper idling on it.
+    private func buildHelipad() {
+        let c = cellSize
+        let pad = SKSpriteNode(texture: ParkArt.helipad(cell: c), size: CGSize(width: c, height: c))
         pad.position = point(for: grid.exit)
         pad.zPosition = 1
         world.addChild(pad)
+
+        let green = UIColor(hex: 0x7DFF8A)
+        let dim = UIColor(hex: 0x2C5A31)
+        let on = ParkArt.light(cell: c, color: green, dim: dim, on: true, radius: 0.045)
+        let off = ParkArt.light(cell: c, color: green, dim: dim, on: false, radius: 0.045)
+        let lightSize = CGSize(width: c * 0.045 * 4.6, height: c * 0.045 * 4.6)
+        let corners: [(CGFloat, CGFloat)] = [(-0.36, 0.36), (0.36, 0.36), (0.36, -0.36), (-0.36, -0.36)]
+        for (i, corner) in corners.enumerated() {
+            let light = SKSpriteNode(texture: off, size: lightSize)
+            light.position = CGPoint(x: corner.0 * c, y: corner.1 * c)
+            light.zPosition = 1
+            pad.addChild(light)
+            var frames = [off, off, off, off]
+            frames[i] = on
+            light.run(.repeatForever(.animate(with: frames, timePerFrame: 0.25)))
+        }
+
+        let s = c * 1.15
+        let heli = SKNode()
+        heli.position = CGPoint(x: pad.position.x, y: pad.position.y + c * 0.05)
+        heli.zPosition = 9
+        heli.zRotation = .pi / 2
+        world.addChild(heli)
+
+        let shadow = SKShapeNode(ellipseOf: CGSize(width: s * 0.66, height: s * 0.38))
+        shadow.fillColor = SKColor(red: 0.02, green: 0.05, blue: 0.02, alpha: 0.3)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: -s * 0.08, y: -s * 0.06)
+        heli.addChild(shadow)
+        heli.addChild(SKSpriteNode(texture: ParkArt.chopperBody(size: s), size: CGSize(width: s * 1.4, height: s * 0.5)))
+
+        let tail = SKSpriteNode(texture: ParkArt.tailRotor(size: s), size: CGSize(width: s * 0.18, height: s * 0.18))
+        tail.position = CGPoint(x: -s * 0.62, y: -s * 0.12)
+        tail.zPosition = 1
+        tail.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 0.15)))
+        heli.addChild(tail)
+
+        let rotor = SKSpriteNode(texture: ParkArt.rotor(size: s), size: CGSize(width: s * 1.16, height: s * 1.16))
+        rotor.zPosition = 2
+        rotor.run(.repeatForever(.rotate(byAngle: -.pi * 2, duration: 0.28)))
+        heli.addChild(rotor)
+        chopper = heli
+    }
+
+    /// Connects every pair of neighboring fences with live wire.
+    private func rebuildWires() {
+        wireLayer.removeAllChildren()
+        let fences = Set(towers.values.filter { $0.kind == .fence }.map { $0.cell })
+        let wireTexture = ParkArt.wire(cell: cellSize)
+        let wireSize = ParkArt.wireSize(cell: cellSize)
+        let signTexture = ParkArt.warningSign(cell: cellSize)
+        for cell in fences {
+            for (dc, dr) in [(1, 0), (0, 1)] {
+                let other = Cell(col: cell.col + dc, row: cell.row + dr)
+                guard fences.contains(other) else { continue }
+                let a = point(for: cell)
+                let b = point(for: other)
+                let mid = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+                let wire = SKSpriteNode(texture: wireTexture, size: wireSize)
+                wire.position = mid
+                wire.zRotation = dc == 1 ? 0 : .pi / 2
+                wireLayer.addChild(wire)
+                if ParkArt.hash(CGFloat(cell.col * 13 + dc), CGFloat(cell.row * 7 + dr)) > 0.55 {
+                    let sign = SKSpriteNode(texture: signTexture, size: CGSize(width: cellSize * 0.34, height: cellSize * 0.34))
+                    sign.position = mid
+                    sign.zPosition = 0.1
+                    wireLayer.addChild(sign)
+                }
+            }
+        }
+    }
+
+    /// Dinos wear a dirt trail into the grass as they run the maze.
+    private func addWear(at cell: Cell) {
+        guard cell != grid.spawn, cell != grid.exit else { return }
+        let count = (wear[cell] ?? 0) + 1
+        wear[cell] = count
+        let patch: SKSpriteNode
+        if let existing = dirt[cell] {
+            patch = existing
+        } else {
+            let variant = Int(ParkArt.hash(CGFloat(cell.col), CGFloat(cell.row)) * 4)
+            patch = SKSpriteNode(texture: ParkArt.dirt(cell: cellSize, variant: variant), size: CGSize(width: cellSize, height: cellSize))
+            patch.position = point(for: cell)
+            patch.zPosition = 0.5
+            patch.alpha = 0
+            world.addChild(patch)
+            dirt[cell] = patch
+        }
+        patch.alpha = min(0.85, 0.1 + CGFloat(count) * 0.02)
     }
 
     // MARK: - Grid math
@@ -162,8 +316,19 @@ final class GameScene: SKScene {
             startNewGame()
             return
         }
+        if let menu = pauseMenu {
+            let hits = menu.nodes(at: touch.location(in: menu)).compactMap { $0.name }
+            if hits.contains("restart") {
+                startNewGame()
+            } else if hits.contains("resume") {
+                closePauseMenu()
+            }
+            return
+        }
         if let action = hud.action(at: touch.location(in: self)) {
             switch action {
+            case .pause:
+                openPauseMenu()
             case .sendWave:
                 sendWave()
             case .pick(let picked):
@@ -216,7 +381,9 @@ final class GameScene: SKScene {
         tower.run(.scale(to: 1, duration: 0.12))
         world.addChild(tower)
         towers[cell] = tower
-        if kind != .fence {
+        if kind == .fence {
+            rebuildWires()
+        } else {
             showRange(of: tower)
         }
     }
@@ -242,19 +409,23 @@ final class GameScene: SKScene {
         towers[tower.cell] = nil
         grid.unblock(tower.cell)
         tower.removeFromParent()
+        if tower.kind == .fence {
+            rebuildWires()
+        }
     }
 
     // MARK: - Waves
 
     private func sendWave() {
-        guard !waveActive, !isOver, wavesStarted < Waves.all.count else { return }
-        let wave = Waves.all[wavesStarted]
+        guard !waveActive, !isOver, wavesStarted < Waves.total else { return }
+        let wave = Waves.groups(forWave: wavesStarted + 1)
         wavesStarted += 1
         spawnQueue = Waves.schedule(wave)
         waveClock = 0
         waveActive = true
-        hud.setWave(wavesStarted, of: Waves.all.count)
+        hud.setWave(wavesStarted, of: Waves.total)
         hud.setSendEnabled(false, title: "Incoming")
+        setGate(open: true)
         hud.flash("Wave \(wavesStarted): \(Waves.summary(wave))")
     }
 
@@ -289,9 +460,10 @@ final class GameScene: SKScene {
     private func checkWaveEnd() {
         guard waveActive, spawnQueue.isEmpty, dinos.isEmpty else { return }
         waveActive = false
+        setGate(open: false)
         let bonus = 8 + 2 * wavesStarted
         cash += bonus
-        if wavesStarted == Waves.all.count {
+        if wavesStarted == Waves.total {
             endGame(won: true)
         } else {
             hud.setSendEnabled(true)
@@ -304,12 +476,13 @@ final class GameScene: SKScene {
     override func update(_ currentTime: TimeInterval) {
         let dt = lastUpdate == 0 ? 0 : min(currentTime - lastUpdate, 1.0 / 20.0)
         lastUpdate = currentTime
-        guard !isOver, dt > 0 else { return }
+        guard !isOver, pauseMenu == nil, dt > 0 else { return }
 
         spawnDue(dt)
         moveDinos(dt)
         fireTowers(dt)
         moveShots(dt)
+        sparkFences(dt)
         checkWaveEnd()
     }
 
@@ -331,6 +504,7 @@ final class GameScene: SKScene {
                 dino.position = dest
                 budget -= dist
                 dino.cell = dino.target
+                addWear(at: dino.cell)
                 if dino.cell == grid.exit {
                     escaped.append(dino)
                     break
@@ -368,6 +542,7 @@ final class GameScene: SKScene {
             tower.cooldown = tower.kind.fireInterval
 
             if tower.kind == .flare {
+                tower.showFire()
                 pulse(from: tower, radius: reach)
                 for dino in inRange {
                     hit(dino, for: tower.damage)
@@ -381,17 +556,21 @@ final class GameScene: SKScene {
     }
 
     private func fire(from tower: Tower, at target: Dino) {
-        let node = SKShapeNode(circleOfRadius: cellSize * 0.07)
-        node.fillColor = tower.kind.shotColor
-        node.strokeColor = .clear
-        node.position = tower.position
+        tower.showFire()
+        let isDart = tower.kind == .tranq
+        let node = isDart
+            ? SKSpriteNode(texture: ParkArt.dart(cell: cellSize), size: CGSize(width: cellSize * 0.26, height: cellSize * 0.1))
+            : SKSpriteNode(texture: ParkArt.tracer(cell: cellSize), size: CGSize(width: cellSize * 0.3, height: cellSize * 0.1))
+        let angle = atan2(target.position.y - tower.position.y, target.position.x - tower.position.x)
+        node.zRotation = angle
+        node.position = CGPoint(x: tower.position.x + cos(angle) * cellSize * 0.45, y: tower.position.y + sin(angle) * cellSize * 0.45)
         node.zPosition = 7
         world.addChild(node)
         shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow))
     }
 
     private func moveShots(_ dt: TimeInterval) {
-        let step = cellSize * 9 * CGFloat(dt)
+        let step = cellSize * 10 * CGFloat(dt)
         for shot in shots {
             if shot.target.isDead {
                 shot.node.removeFromParent()
@@ -401,7 +580,9 @@ final class GameScene: SKScene {
             let dx = shot.target.position.x - shot.node.position.x
             let dy = shot.target.position.y - shot.node.position.y
             let dist = hypot(dx, dy)
+            shot.node.zRotation = atan2(dy, dx)
             if dist <= step {
+                puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
                 hit(shot.target, for: shot.damage, slow: shot.slow)
                 shot.node.removeFromParent()
                 shot.done = true
@@ -424,8 +605,9 @@ final class GameScene: SKScene {
     }
 
     private func kill(_ dino: Dino) {
-        cash += dino.kind.reward
-        floatText("+$\(dino.kind.reward)", at: dino.position)
+        let reward = Int((CGFloat(dino.kind.reward) * Waves.rewardScale(forWave: max(0, wavesStarted - 1))).rounded())
+        cash += reward
+        floatText("+$\(reward)", at: dino.position)
         dinos.removeAll { $0 === dino }
         dino.run(.sequence([
             .group([.fadeOut(withDuration: 0.25), .scale(to: 1.4, duration: 0.25)]),
@@ -436,6 +618,15 @@ final class GameScene: SKScene {
     private func endGame(won: Bool) {
         isOver = true
         waveActive = false
+        if won, let chopper {
+            let lift = SKAction.group([
+                .scale(to: 1.7, duration: 1.4),
+                .moveBy(x: 0, y: cellSize * 3, duration: 1.4),
+                .sequence([.wait(forDuration: 0.8), .fadeOut(withDuration: 0.6)])
+            ])
+            lift.timingMode = .easeIn
+            chopper.run(lift)
+        }
 
         let overlay = SKSpriteNode(color: SKColor(white: 0, alpha: 0.7), size: size)
         overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -463,7 +654,57 @@ final class GameScene: SKScene {
         overlay.addChild(again)
 
         overlay.alpha = 0
-        overlay.run(.fadeIn(withDuration: 0.3))
+        overlay.run(.sequence([.wait(forDuration: won ? 1.2 : 0), .fadeIn(withDuration: 0.3)]))
+    }
+
+    // MARK: - Pause menu
+
+    private func openPauseMenu() {
+        guard pauseMenu == nil, !isOver else { return }
+        world.isPaused = true
+
+        let menu = SKNode()
+        menu.zPosition = 100
+        menu.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        addChild(menu)
+        pauseMenu = menu
+
+        let dim = SKSpriteNode(color: SKColor(white: 0, alpha: 0.72), size: size)
+        menu.addChild(dim)
+
+        let title = makeLabel("PAUSED", size: 30, font: Fonts.heavy, color: Palette.warning)
+        title.position = CGPoint(x: 0, y: 96)
+        menu.addChild(title)
+
+        let status = makeLabel("Wave \(wavesStarted) of \(Waves.total)  ·  \(lives) lives  ·  $\(cash)", size: 14, color: Palette.muted)
+        status.position = CGPoint(x: 0, y: 64)
+        menu.addChild(status)
+
+        menu.addChild(menuButton("Resume", name: "resume", fill: Palette.warning, text: Palette.bar, outlined: false, y: 10))
+        menu.addChild(menuButton("Restart", name: "restart", fill: Palette.panel, text: Palette.danger, outlined: true, y: -50))
+
+        let note = makeLabel("Restarting starts over from wave 1", size: 13, color: Palette.muted)
+        note.position = CGPoint(x: 0, y: -94)
+        menu.addChild(note)
+    }
+
+    private func closePauseMenu() {
+        pauseMenu?.removeFromParent()
+        pauseMenu = nil
+        world.isPaused = false
+    }
+
+    private func menuButton(_ title: String, name: String, fill: SKColor, text: SKColor, outlined: Bool, y: CGFloat) -> SKNode {
+        let button = SKShapeNode(rectOf: CGSize(width: 200, height: 48), cornerRadius: 12)
+        button.name = name
+        button.fillColor = fill
+        button.strokeColor = text.withAlphaComponent(0.6)
+        button.lineWidth = outlined ? 2 : 0
+        button.position = CGPoint(x: 0, y: y)
+        let label = makeLabel(title, size: 18, font: Fonts.heavy, color: text)
+        label.name = name
+        button.addChild(label)
+        return button
     }
 
     // MARK: - Effects
@@ -481,16 +722,56 @@ final class GameScene: SKScene {
     private func pulse(from tower: Tower, radius: CGFloat) {
         let ring = SKShapeNode(circleOfRadius: radius)
         ring.position = tower.position
-        ring.strokeColor = tower.kind.color
-        ring.fillColor = tower.kind.color.withAlphaComponent(0.2)
-        ring.lineWidth = 2
+        ring.strokeColor = UIColor(red: 1, green: 0.78, blue: 0.43, alpha: 0.9)
+        ring.fillColor = UIColor(red: 1, green: 0.55, blue: 0.24, alpha: 0.3)
+        ring.lineWidth = 3
         ring.zPosition = 4
         ring.setScale(0.3)
         world.addChild(ring)
         ring.run(.sequence([
-            .group([.scale(to: 1, duration: 0.25), .fadeOut(withDuration: 0.35)]),
+            .group([.scale(to: 1, duration: 0.3), .fadeOut(withDuration: 0.45)]),
             .removeFromParent()
         ]))
+        for i in 0..<10 {
+            let a = CGFloat(i) * .pi / 5 + CGFloat.random(in: 0...0.3)
+            let ember = SKShapeNode(circleOfRadius: cellSize * 0.045)
+            ember.fillColor = i % 2 == 0 ? ParkArt.flareLight : ParkArt.ember
+            ember.strokeColor = .clear
+            ember.position = tower.position
+            ember.zPosition = 4.1
+            world.addChild(ember)
+            let reach = radius * CGFloat.random(in: 0.7...0.95)
+            ember.run(.sequence([
+                .group([
+                    .move(by: CGVector(dx: cos(a) * reach, dy: sin(a) * reach), duration: 0.4),
+                    .scale(to: 0.2, duration: 0.4),
+                    .fadeOut(withDuration: 0.4)
+                ]),
+                .removeFromParent()
+            ]))
+        }
+    }
+
+    private func puff(at point: CGPoint, color: UIColor) {
+        let spark = SKSpriteNode(texture: ParkArt.spark(cell: cellSize, color: color), size: CGSize(width: cellSize * 0.4, height: cellSize * 0.4))
+        spark.position = point
+        spark.zPosition = 8
+        spark.setScale(0.6)
+        world.addChild(spark)
+        spark.run(.sequence([
+            .group([.scale(to: 1.2, duration: 0.2), .fadeOut(withDuration: 0.2)]),
+            .removeFromParent()
+        ]))
+    }
+
+    /// Now and then a fence post throws a spark.
+    private func sparkFences(_ dt: TimeInterval) {
+        sparkTimer -= dt
+        guard sparkTimer <= 0 else { return }
+        sparkTimer = TimeInterval.random(in: 0.3...1.0)
+        guard let post = towers.values.filter({ $0.kind == .fence }).randomElement() else { return }
+        let offset = CGPoint(x: cellSize * 0.1, y: cellSize * 0.1)
+        puff(at: CGPoint(x: post.position.x + offset.x, y: post.position.y + offset.y), color: UIColor(hex: 0xE8F6FF))
     }
 
     private func floatText(_ text: String, at point: CGPoint) {

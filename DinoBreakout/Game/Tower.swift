@@ -12,15 +12,6 @@ enum BuildKind: CaseIterable {
         }
     }
 
-    var icon: String {
-        switch self {
-        case .fence: "⚡️"
-        case .tranq: "💉"
-        case .turret: "🎯"
-        case .flare: "🔥"
-        }
-    }
-
     var cost: Int {
         switch self {
         case .fence: 5
@@ -71,10 +62,6 @@ enum BuildKind: CaseIterable {
         case .flare: SKColor(red: 0.9, green: 0.45, blue: 0.15, alpha: 1)
         }
     }
-
-    var shotColor: SKColor {
-        self == .tranq ? .cyan : Palette.warning
-    }
 }
 
 /// Anything you build. Every tower is also a wall, so it shapes the maze.
@@ -87,61 +74,31 @@ final class Tower: SKNode {
     private(set) var invested: Int
     var cooldown: TimeInterval = 0
 
-    private var head: SKNode?
-    private var pips: [SKShapeNode] = []
+    private let cellSize: CGFloat
+    private let base: SKSpriteNode
+    /// Turns to aim. Holds the gun, which kicks back when it fires.
+    private let head = SKNode()
+    private var gun: SKSpriteNode?
+    private var flashes: [SKSpriteNode] = []
 
     init(kind: BuildKind, cell: Cell, cellSize: CGFloat) {
         self.kind = kind
         self.cell = cell
+        self.cellSize = cellSize
         invested = kind.cost
+        if kind == .fence {
+            base = SKSpriteNode(texture: ParkArt.fencePost(cell: cellSize), size: CGSize(width: cellSize * 0.6, height: cellSize * 0.6))
+        } else {
+            base = SKSpriteNode(texture: ParkArt.pad(kind, level: 1, cell: cellSize), size: CGSize(width: cellSize, height: cellSize))
+        }
         super.init()
         zPosition = 3
-
-        let side = cellSize * 0.86
-        let base = SKShapeNode(rectOf: CGSize(width: side, height: side), cornerRadius: 4)
         addChild(base)
-
-        switch kind {
-        case .fence:
-            base.fillColor = kind.color
-            base.strokeColor = Palette.warning
-            base.lineWidth = 1.5
-            let stripe = SKSpriteNode(color: Palette.warning, size: CGSize(width: side * 0.8, height: 2))
-            addChild(stripe)
-        case .flare:
-            base.fillColor = kind.color.withAlphaComponent(0.35)
-            base.strokeColor = kind.color
-            base.lineWidth = 2
-            let fire = SKLabelNode(text: kind.icon)
-            fire.fontSize = cellSize * 0.5
-            fire.verticalAlignmentMode = .center
-            addChild(fire)
-        case .tranq, .turret:
-            base.fillColor = kind.color.withAlphaComponent(0.35)
-            base.strokeColor = kind.color
-            base.lineWidth = 2
-            let gun = SKNode()
-            let barrel = SKSpriteNode(color: kind.color, size: CGSize(width: cellSize * 0.1, height: cellSize * 0.34))
-            barrel.anchorPoint = CGPoint(x: 0.5, y: 0)
-            gun.addChild(barrel)
-            let hub = SKShapeNode(circleOfRadius: cellSize * 0.2)
-            hub.fillColor = kind.color
-            hub.strokeColor = .white
-            hub.lineWidth = 1
-            gun.addChild(hub)
-            addChild(gun)
-            head = gun
-        }
-
         if kind != .fence {
-            for i in 0..<Tower.maxLevel {
-                let pip = SKShapeNode(circleOfRadius: cellSize * 0.04)
-                pip.position = CGPoint(x: CGFloat(i - 1) * cellSize * 0.12, y: -side / 2 + cellSize * 0.08)
-                pip.strokeColor = .clear
-                addChild(pip)
-                pips.append(pip)
-            }
-            refreshPips()
+            head.zRotation = .pi / 2
+            head.zPosition = 1
+            addChild(head)
+            buildGun()
         }
     }
 
@@ -172,17 +129,59 @@ final class Tower: SKNode {
         guard let cost = upgradeCost else { return }
         invested += cost
         level += 1
-        refreshPips()
+        base.texture = ParkArt.pad(kind, level: level, cell: cellSize)
+        buildGun()
+        run(.sequence([.scale(to: 1.15, duration: 0.08), .scale(to: 1, duration: 0.12)]))
     }
 
     /// Point the gun at a spot in the same coordinate space as the tower.
     func aim(at point: CGPoint) {
-        head?.zRotation = atan2(point.y - position.y, point.x - position.x) - .pi / 2
+        head.zRotation = atan2(point.y - position.y, point.x - position.x)
     }
 
-    private func refreshPips() {
-        for (i, pip) in pips.enumerated() {
-            pip.fillColor = i < level ? Palette.warning : SKColor(white: 1, alpha: 0.25)
+    /// Recoil and muzzle flash, or a flare's flare up.
+    func showFire() {
+        guard let gun else { return }
+        if kind == .flare {
+            gun.run(.sequence([.scale(to: 1.12, duration: 0.06), .scale(to: 1, duration: 0.15)]), withKey: "fire")
+            return
         }
+        gun.removeAction(forKey: "fire")
+        gun.position = .zero
+        gun.run(.sequence([
+            .moveBy(x: -cellSize * 0.05, y: 0, duration: 0.03),
+            .move(to: .zero, duration: 0.09)
+        ]), withKey: "fire")
+        for flash in flashes {
+            flash.removeAllActions()
+            flash.isHidden = false
+            flash.run(.sequence([.wait(forDuration: 0.05), .hide()]))
+        }
+    }
+
+    private func buildGun() {
+        head.removeAllChildren()
+        flashes = []
+        let side = cellSize * ParkArt.headScale
+        let size = CGSize(width: side, height: side)
+        let sprite: SKSpriteNode
+        if kind == .flare {
+            let frames = (0..<3).map { ParkArt.head(kind, level: level, cell: cellSize, frame: $0) }
+            sprite = SKSpriteNode(texture: frames[0], size: size)
+            sprite.run(.repeatForever(.animate(with: frames, timePerFrame: 0.12)))
+        } else {
+            sprite = SKSpriteNode(texture: ParkArt.head(kind, level: level, cell: cellSize), size: size)
+            let flashSize = CGSize(width: cellSize * 0.3, height: cellSize * 0.3)
+            for y in ParkArt.muzzles(kind, level: level, cell: cellSize) {
+                let flash = SKSpriteNode(texture: ParkArt.muzzleFlash(cell: cellSize), size: flashSize)
+                flash.position = CGPoint(x: cellSize * 0.5, y: -y)
+                flash.zPosition = 1
+                flash.isHidden = true
+                sprite.addChild(flash)
+                flashes.append(flash)
+            }
+        }
+        head.addChild(sprite)
+        gun = sprite
     }
 }
