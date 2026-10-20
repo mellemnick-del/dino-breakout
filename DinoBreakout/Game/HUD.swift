@@ -201,6 +201,15 @@ final class HUD: SKNode {
         messagePill.run(.sequence([.wait(forDuration: 1.8), .fadeOut(withDuration: 0.4)]))
     }
 
+    /// Where a build bar button sits, for the tutorial's attention ring.
+    func frame(for tool: Tool) -> CGRect? {
+        toolButtons.first(where: { $0.tool == tool })?.node.frame
+    }
+
+    var sendButtonFrame: CGRect {
+        sendButton.frame
+    }
+
     /// Which control, if any, sits under a point in scene coordinates.
     func action(at point: CGPoint) -> HUDAction? {
         if pauseButton.contains(point) {

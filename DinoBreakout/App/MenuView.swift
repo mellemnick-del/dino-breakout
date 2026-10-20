@@ -479,6 +479,8 @@ struct TrophyRoom: View {
 struct SettingsView: View {
     @AppStorage(SoundBank.musicKey) private var music = 0.5
     @AppStorage(SoundBank.effectsKey) private var effects = 0.8
+    @AppStorage(Haptics.key) private var haptics = true
+    @State private var tutorialReset = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -496,6 +498,19 @@ struct SettingsView: View {
                     Text("Sound")
                 } footer: {
                     Text("Slide all the way left to turn one off. The game also follows your phone's silent switch.")
+                }
+
+                Section("Feel") {
+                    Toggle(isOn: $haptics) {
+                        Label("Vibration", systemImage: "iphone.radiowaves.left.and.right")
+                    }
+                    Button {
+                        Tutorial.reset()
+                        tutorialReset = true
+                    } label: {
+                        Label(tutorialReset ? "Tutorial will play on Paddock B" : "Replay the tutorial", systemImage: "graduationcap.fill")
+                    }
+                    .disabled(tutorialReset)
                 }
 
                 Section("Difficulty") {

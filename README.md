@@ -30,6 +30,9 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 - You can never fully block the path. If a placement would seal the dinos in, it's refused.
 - Tap any tower you built to open its panel: its level (1 of 5, also shown as rank chevrons; levels 4 and 5 add gold trim, and level 5 a gold star), an **Upgrade** button with the price, **Sell** for 70% back, and its range.
 - Or pick **Sell** in the build bar and tap towers to sell them quickly.
+- **Abilities:** every tower's panel has a special move that recharges (25 seconds, 30 for napalm): Tranq **Sleep Gas** nearly freezes everything close by for 3 seconds, Turret **Overdrive** fires three times as fast for 5 seconds, Flare **Napalm** leaves a burning patch that ignores armor, and Flak **Barrage** blasts every flyer in range.
+- **Tutorial:** the first game on Paddock B walks you through fences, a turret, a wave, and an upgrade. Replay it from Settings.
+- **Vibration:** taps when you build, a punch on upgrades and abilities, a stomp when a T-Rex arrives. Turn it off in Settings.
 - Tap **Send Wave** when your maze is ready. Clearing a wave pays a bonus.
 - While a wave is running, the same button is the speed toggle: 1x, 2x, 3x.
 - Survive 50 waves to win. Every tenth wave is a T-Rex boss wave, with one more T-Rex each time.

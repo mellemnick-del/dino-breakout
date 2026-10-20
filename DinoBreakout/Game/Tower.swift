@@ -54,6 +54,32 @@ enum BuildKind: CaseIterable {
         }
     }
 
+    /// Each tower's special move, triggered from its panel.
+    var abilityName: String? {
+        switch self {
+        case .fence: nil
+        case .tranq: "Sleep Gas"
+        case .turret: "Overdrive"
+        case .flare: "Napalm"
+        case .flak: "Barrage"
+        }
+    }
+
+    var abilityDetail: String {
+        switch self {
+        case .fence: ""
+        case .tranq: "Nearly freezes everything close by for 3 seconds"
+        case .turret: "Fires three times as fast for 5 seconds"
+        case .flare: "Leaves a burning patch for 4 seconds"
+        case .flak: "Blasts every flyer in range at once"
+        }
+    }
+
+    /// Seconds before the ability can be used again.
+    var abilityRecharge: TimeInterval {
+        self == .flare ? 30 : 25
+    }
+
     /// Flares burn the ground, so they can't reach flyers.
     var hitsAir: Bool {
         self != .flare && self != .fence
@@ -94,6 +120,11 @@ final class Tower: SKNode {
     private(set) var level = 1
     private(set) var invested: Int
     var cooldown: TimeInterval = 0
+    /// Seconds until the special ability is ready again.
+    var abilityCooldown: TimeInterval = 0
+    /// Seconds of turret overdrive left.
+    private(set) var overdriveLeft: TimeInterval = 0
+    private var overdriveGlow: SKShapeNode?
 
     private let cellSize: CGFloat
     private let base: SKSpriteNode
@@ -155,6 +186,30 @@ final class Tower: SKNode {
         base.texture = ParkArt.pad(kind, level: level, cell: cellSize)
         buildGun()
         run(.sequence([.scale(to: 1.15, duration: 0.08), .scale(to: 1, duration: 0.12)]))
+    }
+
+    /// Counts down the ability recharge and any overdrive.
+    func tickAbility(_ dt: TimeInterval) {
+        abilityCooldown = max(0, abilityCooldown - dt)
+        guard overdriveLeft > 0 else { return }
+        overdriveLeft -= dt
+        if overdriveLeft <= 0 {
+            overdriveGlow?.removeFromParent()
+            overdriveGlow = nil
+        }
+    }
+
+    func startOverdrive(for duration: TimeInterval) {
+        overdriveLeft = duration
+        guard overdriveGlow == nil else { return }
+        let glow = SKShapeNode(circleOfRadius: cellSize * 0.47)
+        glow.strokeColor = SKColor(red: 1, green: 0.35, blue: 0.2, alpha: 0.9)
+        glow.fillColor = SKColor(red: 1, green: 0.3, blue: 0.1, alpha: 0.15)
+        glow.lineWidth = 3
+        glow.zPosition = 0.5
+        glow.run(.repeatForever(.sequence([.fadeAlpha(to: 0.4, duration: 0.2), .fadeAlpha(to: 1, duration: 0.2)])))
+        addChild(glow)
+        overdriveGlow = glow
     }
 
     /// Point the gun at a spot in the same coordinate space as the tower.
