@@ -133,6 +133,10 @@ TestFlight lets you (and your family) install the game from Apple's TestFlight a
 
 For every new upload, raise the **Build** number (target, General tab) before archiving, or App Store Connect will reject it.
 
+## App Store
+
+The full listing (name, subtitle, description, keywords, category, age rating, privacy answers, and a screenshot plan) is in `docs/AppStoreListing.md`, along with the steps to turn on Game Center leaderboards for endless records and daily challenges.
+
 ## Roadmap
 
 Next up:

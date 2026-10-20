@@ -46,6 +46,7 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             SoundBank.shared.start()
+            GameCenter.signIn()
         }
     }
 }

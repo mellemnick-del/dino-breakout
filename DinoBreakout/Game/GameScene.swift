@@ -769,12 +769,14 @@ final class GameScene: SKScene {
         setGate(open: false)
         if let challenge {
             challenge.record(wave: wavesStarted)
+            GameCenter.submitDaily(wave: wavesStarted)
         } else {
             if wavesStarted <= Waves.total {
                 Progress.record(wave: wavesStarted, level: level, difficulty: difficulty)
             }
             if endless {
                 Progress.recordEndless(wave: wavesStarted, level: level, difficulty: difficulty)
+                GameCenter.submitEndless(wave: wavesStarted, level: level)
             }
             if wavesStarted >= 10 {
                 award(.holdingTheLine)
