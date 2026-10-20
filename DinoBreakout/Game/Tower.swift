@@ -132,8 +132,10 @@ final class Tower: SKNode {
         kind.range + 0.3 * CGFloat(level - 1)
     }
 
+    /// Each level hits harder, but levels 4 and 5 add less than the first upgrades.
     var damage: CGFloat {
-        kind.damage * pow(1.6, CGFloat(level - 1))
+        let multipliers: [CGFloat] = [1, 1.6, 2.5, 3.6, 5]
+        return kind.damage * multipliers[min(max(level, 1), multipliers.count) - 1]
     }
 
     /// Nil for fences and maxed towers.

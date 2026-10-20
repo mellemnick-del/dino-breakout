@@ -122,7 +122,7 @@ enum Difficulty: String, CaseIterable, Identifiable {
 
     var blurb: String {
         switch self {
-        case .easy: "30 lives, $150 to start, softer dinos."
+        case .easy: "30 lives, $150 to start, a little softer dinos."
         case .medium: "20 lives, $100 to start. The intended fight."
         case .hard: "10 lives, $80 to start, tougher dinos, smaller bounties."
         }
@@ -147,9 +147,9 @@ enum Difficulty: String, CaseIterable, Identifiable {
     /// Multiplies every dino's health.
     var health: CGFloat {
         switch self {
-        case .easy: 0.7
+        case .easy: 0.8
         case .medium: 1
-        case .hard: 1.35
+        case .hard: 1.3
         }
     }
 

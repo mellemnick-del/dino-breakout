@@ -139,12 +139,12 @@ enum Waves {
     /// Dinos get tougher every wave. `index` is zero based.
     static func healthScale(forWave index: Int) -> CGFloat {
         let i = CGFloat(index)
-        return 1 + 0.14 * i + 0.003 * i * i
+        return 1 + 0.15 * i + 0.012 * i * i
     }
 
     /// Bounties grow too, so the economy keeps up with the dinos.
     static func rewardScale(forWave index: Int) -> CGFloat {
-        1 + 0.04 * CGFloat(index)
+        1 + 0.02 * CGFloat(index)
     }
 
     /// Flattens a wave into spawn times, earliest first.

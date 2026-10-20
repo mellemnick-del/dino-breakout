@@ -636,7 +636,9 @@ final class GameScene: SKScene {
         )
         dino.target = grid.nextStep(from: grid.spawn) ?? grid.spawn
         dino.position = point(for: grid.spawn)
-        dino.speedScale = challenge?.speedScale ?? 1
+        // Late waves move a little faster, so a long maze buys less time
+        let lateWaveSpeed = 1 + 0.004 * CGFloat(min(max(wavesStarted - 1, 0), 60))
+        dino.speedScale = (challenge?.speedScale ?? 1) * lateWaveSpeed
         if kind == .rex {
             waveHadRex = true
         }
@@ -685,7 +687,7 @@ final class GameScene: SKScene {
         if gameSpeed == 3 {
             award(.fastForward)
         }
-        let bonus = 8 + 2 * min(wavesStarted, Waves.total)
+        let bonus = 5 + min(wavesStarted, Waves.total)
         cash += bonus
         if !endless && wavesStarted == waveGoal {
             endGame(won: true)
