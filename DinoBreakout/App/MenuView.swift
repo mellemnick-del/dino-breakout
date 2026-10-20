@@ -20,7 +20,8 @@ enum MenuColor {
 }
 
 struct MenuView: View {
-    let onPlay: (Level, Difficulty) -> Void
+    /// Park, difficulty, and whether it's an endless run.
+    let onPlay: (Level, Difficulty, Bool) -> Void
 
     @AppStorage("difficulty") private var difficultyRaw = Difficulty.medium.rawValue
     @State private var showSettings = false
@@ -136,13 +137,23 @@ struct MenuView: View {
             }
             ForEach(Level.all) { level in
                 let unlocked = Progress.isUnlocked(level)
-                Button {
-                    onPlay(level, difficulty)
-                } label: {
-                    ParkCard(level: level, best: Progress.best(level: level, difficulty: difficulty), locked: !unlocked)
+                VStack(spacing: 6) {
+                    Button {
+                        onPlay(level, difficulty, false)
+                    } label: {
+                        ParkCard(level: level, best: Progress.best(level: level, difficulty: difficulty), locked: !unlocked)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!unlocked)
+                    if unlocked && Progress.hasBeaten(level) {
+                        Button {
+                            onPlay(level, difficulty, true)
+                        } label: {
+                            EndlessRow(best: Progress.endlessBest(level: level, difficulty: difficulty))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(!unlocked)
             }
             HStack(spacing: 12) {
                 Image(systemName: "lock.fill")
@@ -163,6 +174,32 @@ struct MenuView: View {
             .font(.system(size: 12, weight: .bold, design: .monospaced))
             .tracking(1.5)
             .foregroundStyle(MenuColor.muted)
+    }
+}
+
+/// Endless mode for a park you've beaten, with your record.
+private struct EndlessRow: View {
+    let best: Int
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "infinity")
+                .font(.system(size: 16, weight: .heavy))
+            Text("Endless")
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+            Spacer()
+            Text(best > 0 ? "Record: wave \(best)" : "No record yet")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+            Image(systemName: "play.fill")
+                .font(.system(size: 12, weight: .bold))
+        }
+        .foregroundStyle(MenuColor.hazardInk)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(MenuColor.hazard, in: RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Starts an endless run")
     }
 }
 

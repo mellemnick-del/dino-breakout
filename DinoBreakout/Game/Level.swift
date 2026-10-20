@@ -186,6 +186,20 @@ enum Progress {
         Level.all.reduce(0) { $0 + stars(forBest: best(level: $1, difficulty: difficulty)) }
     }
 
+    /// Beaten all 50 waves on this park, on any difficulty. Unlocks endless mode.
+    static func hasBeaten(_ level: Level) -> Bool {
+        Difficulty.allCases.contains { best(level: level, difficulty: $0) >= Waves.total }
+    }
+
+    static func endlessBest(level: Level, difficulty: Difficulty) -> Int {
+        UserDefaults.standard.integer(forKey: "endless-" + key(level, difficulty))
+    }
+
+    static func recordEndless(wave: Int, level: Level, difficulty: Difficulty) {
+        guard wave > endlessBest(level: level, difficulty: difficulty) else { return }
+        UserDefaults.standard.set(wave, forKey: "endless-" + key(level, difficulty))
+    }
+
     static func best(level: Level, difficulty: Difficulty) -> Int {
         UserDefaults.standard.integer(forKey: key(level, difficulty))
     }

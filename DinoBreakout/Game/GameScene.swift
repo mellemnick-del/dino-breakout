@@ -29,6 +29,10 @@ final class GameScene: SKScene {
 
     let level: Level
     let difficulty: Difficulty
+    /// Whether this run started in endless mode from the menu.
+    let startedEndless: Bool
+    /// Waves never run out. Also switches on when you keep going after wave 50.
+    private var endless: Bool
     /// Called when the player leaves for the main menu.
     var onExit: (() -> Void)?
 
@@ -73,6 +77,8 @@ final class GameScene: SKScene {
     private var warnedAboutFlyers = false
     /// 1x, 2x, or 3x, toggled with the wave button while a wave is running.
     private var gameSpeed = 1
+    /// Where the chopper idles, so it can land again after a win.
+    private var chopperHome: CGPoint = .zero
     /// Showing while the game is paused.
     private var pauseMenu: SKNode?
     /// Showing once the game is won or lost.
@@ -82,9 +88,11 @@ final class GameScene: SKScene {
     private weak var selectedTower: Tower?
     private var selectedRing: SKShapeNode?
 
-    init(size: CGSize, level: Level, difficulty: Difficulty) {
+    init(size: CGSize, level: Level, difficulty: Difficulty, endless: Bool = false) {
         self.level = level
         self.difficulty = difficulty
+        startedEndless = endless
+        self.endless = endless
         grid = Grid(level: level)
         super.init(size: size)
     }
@@ -149,11 +157,16 @@ final class GameScene: SKScene {
         addChild(hud)
         cash = difficulty.startingCash
         lives = difficulty.lives
-        hud.setWave(0, of: Waves.total)
+        endless = startedEndless
+        hud.setWave(0, of: endless ? nil : Waves.total)
         hud.setSendEnabled(true)
         tool = .build(.fence)
         hud.select(tool)
-        hud.flash("\(level.name) · \(difficulty.title). Build a maze, then tap Send Wave")
+        if endless {
+            hud.flash("Endless \(level.name). How long can you hold the line?")
+        } else {
+            hud.flash("\(level.name) · \(difficulty.title). Build a maze, then tap Send Wave")
+        }
     }
 
     private func drawBoard() {
@@ -293,6 +306,7 @@ final class GameScene: SKScene {
         heli.position = CGPoint(x: pad.position.x, y: pad.position.y + c * 0.05)
         heli.zPosition = 9
         heli.zRotation = .pi / 2
+        chopperHome = heli.position
         world.addChild(heli)
 
         let shadow = SKShapeNode(ellipseOf: CGSize(width: s * 0.66, height: s * 0.38))
@@ -390,7 +404,9 @@ final class GameScene: SKScene {
         guard let touch = touches.first else { return }
         if let overlay = gameOverOverlay {
             let hits = overlay.nodes(at: touch.location(in: overlay)).compactMap { $0.name }
-            if hits.contains("restart") {
+            if hits.contains("endless") {
+                keepGoing()
+            } else if hits.contains("restart") {
                 startNewGame()
             } else if hits.contains("menu") {
                 onExit?()
@@ -541,13 +557,13 @@ final class GameScene: SKScene {
     // MARK: - Waves
 
     private func sendWave() {
-        guard !waveActive, !isOver, wavesStarted < Waves.total else { return }
+        guard !waveActive, !isOver, endless || wavesStarted < Waves.total else { return }
         let wave = Waves.groups(forWave: wavesStarted + 1, flyerHeavy: level.flyerHeavy)
         wavesStarted += 1
         spawnQueue = Waves.schedule(wave)
         waveClock = 0
         waveActive = true
-        hud.setWave(wavesStarted, of: Waves.total)
+        hud.setWave(wavesStarted, of: endless ? nil : Waves.total)
         hud.setSpeed(gameSpeed)
         setGate(open: true)
         SoundBank.shared.play(.alarm)
@@ -602,10 +618,15 @@ final class GameScene: SKScene {
         guard waveActive, spawnQueue.isEmpty, dinos.isEmpty else { return }
         waveActive = false
         setGate(open: false)
-        Progress.record(wave: wavesStarted, level: level, difficulty: difficulty)
-        let bonus = 8 + 2 * wavesStarted
+        if wavesStarted <= Waves.total {
+            Progress.record(wave: wavesStarted, level: level, difficulty: difficulty)
+        }
+        if endless {
+            Progress.recordEndless(wave: wavesStarted, level: level, difficulty: difficulty)
+        }
+        let bonus = 8 + 2 * min(wavesStarted, Waves.total)
         cash += bonus
-        if wavesStarted == Waves.total {
+        if !endless && wavesStarted == Waves.total {
             endGame(won: true)
         } else {
             hud.setSendEnabled(true)
@@ -841,8 +862,9 @@ final class GameScene: SKScene {
         overlay.zPosition = 100
         addChild(overlay)
 
+        let endlessBest = Progress.endlessBest(level: level, difficulty: difficulty)
         let title = makeLabel(
-            won ? "EVACUATION COMPLETE" : "PARK LOST",
+            won ? "EVACUATION COMPLETE" : (endless ? "ENDLESS RUN OVER" : "PARK LOST"),
             size: 28,
             font: Fonts.heavy,
             color: won ? Palette.warning : Palette.danger
@@ -850,20 +872,52 @@ final class GameScene: SKScene {
         title.position = CGPoint(x: 0, y: 30)
         overlay.addChild(title)
 
-        let detail = makeLabel(
-            won ? "Everyone made it out of \(level.name). \(lives) lives left." : "The dinos overran \(level.name) on wave \(wavesStarted).",
-            size: 15
-        )
+        let detailText: String
+        if won {
+            detailText = "Everyone made it out of \(level.name). \(lives) lives left."
+        } else if endless {
+            detailText = "You held to wave \(wavesStarted). Endless record: wave \(max(endlessBest, wavesStarted))."
+        } else {
+            detailText = "The dinos overran \(level.name) on wave \(wavesStarted)."
+        }
+        let detail = makeLabel(detailText, size: 15)
         detail.position = CGPoint(x: 0, y: -8)
         overlay.addChild(detail)
 
-        overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -60))
-        overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -120))
+        if won {
+            overlay.addChild(menuButton("Keep Going ∞", name: "endless", fill: Palette.warning, text: Palette.bar, outlined: false, y: -60))
+            overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.panel, text: Palette.text, outlined: true, y: -120))
+            overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -180))
+        } else {
+            overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -60))
+            overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -120))
+        }
         gameOverOverlay = overlay
         SoundBank.shared.play(won ? .win : .lose)
 
         overlay.alpha = 0
         overlay.run(.sequence([.wait(forDuration: won ? 1.2 : 0), .fadeIn(withDuration: 0.3)]))
+    }
+
+    /// After winning, bring the chopper back down and keep the waves coming.
+    private func keepGoing() {
+        gameOverOverlay?.removeFromParent()
+        gameOverOverlay = nil
+        endless = true
+        isOver = false
+        if let chopper {
+            chopper.removeAllActions()
+            chopper.position = chopperHome
+            chopper.setScale(1.6)
+            chopper.alpha = 0
+            let land = SKAction.group([.scale(to: 1, duration: 1), .fadeIn(withDuration: 0.5)])
+            land.timingMode = .easeOut
+            chopper.run(land)
+        }
+        Progress.recordEndless(wave: wavesStarted, level: level, difficulty: difficulty)
+        hud.setWave(wavesStarted, of: nil)
+        hud.setSendEnabled(true)
+        hud.flash("Endless mode. The dinos keep coming. How long can you hold?")
     }
 
     // MARK: - Tower panel
@@ -968,7 +1022,8 @@ final class GameScene: SKScene {
         title.position = CGPoint(x: 0, y: 96)
         menu.addChild(title)
 
-        let status = makeLabel("Wave \(wavesStarted) of \(Waves.total)  ·  \(lives) lives  ·  $\(cash)", size: 14, color: Palette.muted)
+        let waveText = endless ? "Wave \(wavesStarted) ∞" : "Wave \(wavesStarted) of \(Waves.total)"
+        let status = makeLabel("\(waveText)  ·  \(lives) lives  ·  $\(cash)", size: 14, color: Palette.muted)
         status.position = CGPoint(x: 0, y: 64)
         menu.addChild(status)
 

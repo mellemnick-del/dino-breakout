@@ -15,6 +15,7 @@ struct GameSession: Identifiable {
     let id = UUID()
     let level: Level
     let difficulty: Difficulty
+    var endless = false
 }
 
 /// Shows the main menu, or a game once a park is picked.
@@ -30,8 +31,8 @@ struct RootView: View {
                 .id(session.id)
                 .transition(.opacity)
             } else {
-                MenuView { level, difficulty in
-                    session = GameSession(level: level, difficulty: difficulty)
+                MenuView { level, difficulty, endless in
+                    session = GameSession(level: level, difficulty: difficulty, endless: endless)
                 }
                 .transition(.opacity)
             }
@@ -64,7 +65,7 @@ struct GameView: View {
             }
             .onAppear {
                 guard scene == nil else { return }
-                let newScene = GameScene(size: geo.size, level: session.level, difficulty: session.difficulty)
+                let newScene = GameScene(size: geo.size, level: session.level, difficulty: session.difficulty, endless: session.endless)
                 newScene.scaleMode = .aspectFit
                 newScene.onExit = onExit
                 scene = newScene

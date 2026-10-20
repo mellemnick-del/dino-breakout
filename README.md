@@ -14,6 +14,7 @@ The game opens on a title screen with dinos roaming the park behind it.
 
 - **Difficulty:** Easy (30 lives, $150), Medium (20 lives, $100), or Hard (10 lives, $80, tougher dinos, smaller bounties).
 - **Parks**, in unlock order: Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), Jungle River (a river with two bridges), Visitor Center (buildings to maze around), The Aviary (pterodactyls from wave 3), and Mount Ember (lava pools on volcanic ash). Each park unlocks when you reach wave 10 on the one before it, on any difficulty.
+- **Endless mode:** beat all 50 waves on a park (any difficulty) and its card gets an Endless button. Waves never stop: crowds grow until wave 60, then health keeps climbing, with a T-Rex boss wave every 10 (up to 6 T-Rexes) and pterodactyl flocks. You can also tap **Keep Going** on the victory screen to carry your towers straight into endless. Your endless record is saved per park and difficulty.
 - **Stars:** one at wave 10, two at wave 25, three for beating all 50, tracked per park and difficulty. Each card shows its stars and best wave, and the header shows your total.
 - **Settings** (gear): separate Music and Sound effects volume. All audio is synthesized in code (`Sound.swift`), and it follows the phone's silent switch.
 

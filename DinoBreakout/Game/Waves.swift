@@ -65,7 +65,8 @@ enum Waves {
         if number <= opening.count {
             return opening[max(0, number - 1)]
         }
-        let growth = 1 + CGFloat(number - 10) * 0.04
+        // Past wave 60 the crowds stop growing; health keeps climbing instead
+        let growth = min(3, 1 + CGFloat(number - 10) * 0.04)
         func n(_ base: Int) -> Int { Int((CGFloat(base) * growth).rounded()) }
         let pace = max(0.6, 1 - CGFloat(number - 10) * 0.01)
         func every(_ base: TimeInterval) -> TimeInterval { base * TimeInterval(pace) }
@@ -75,7 +76,7 @@ enum Waves {
 
     private static func lineup(forWave number: Int, n: (Int) -> Int, every: (TimeInterval) -> TimeInterval) -> [SpawnGroup] {
         if number % 10 == 0 {
-            let rexes = number / 10
+            let rexes = min(6, number / 10)
             return [
                 SpawnGroup(kind: .raptor, count: n(10), every: every(0.6)),
                 SpawnGroup(kind: .triceratops, count: n(5), every: every(1.8), startAt: 3),

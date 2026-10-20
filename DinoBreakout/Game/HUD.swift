@@ -142,8 +142,13 @@ final class HUD: SKNode {
         cashLabel.text = "\(cash)"
     }
 
-    func setWave(_ wave: Int, of total: Int) {
-        waveLabel.text = "Wave \(wave)/\(total)"
+    /// Pass nil for endless mode.
+    func setWave(_ wave: Int, of total: Int?) {
+        if let total {
+            waveLabel.text = "Wave \(wave)/\(total)"
+        } else {
+            waveLabel.text = "Wave \(wave) ∞"
+        }
     }
 
     func setSendEnabled(_ enabled: Bool, title: String = "Send Wave") {
