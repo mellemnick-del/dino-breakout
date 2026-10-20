@@ -31,6 +31,10 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 - Tap any tower you built to open its panel: its level (1 of 5, also shown as rank chevrons; levels 4 and 5 add gold trim, and level 5 a gold star), an **Upgrade** button with the price, **Sell** for 70% back, and its range.
 - Or pick **Sell** in the build bar and tap towers to sell them quickly.
 - **Abilities:** every tower's panel has a special move that recharges (25 seconds, 30 for napalm): Tranq **Sleep Gas** nearly freezes everything close by for 3 seconds, Turret **Overdrive** fires three times as fast for 5 seconds, Flare **Napalm** leaves a burning patch that ignores armor, and Flak **Barrage** blasts every flyer in range.
+- **Aim:** towers that shoot have an Aim chip in their panel: First (closest to the helipad), Strongest, Closest, or Flyers.
+- **Air strike:** the round STRIKE button above the build bar. Tap it, then tap the board, and the rescue chopper strafes that whole row. Once per wave.
+- **Interest:** clearing a wave pays 5% interest on the cash you saved, up to $50.
+- **Stats:** the game over screen shows dinos taken down, your MVP tower's share of the damage, and time played.
 - **Tutorial:** the first game on Paddock B walks you through fences, a turret, a wave, and an upgrade. Replay it from Settings.
 - **Vibration:** taps when you build, a punch on upgrades and abilities, a stomp when a T-Rex arrives. Turn it off in Settings.
 - Tap **Send Wave** when your maze is ready. Clearing a wave pays a bonus.

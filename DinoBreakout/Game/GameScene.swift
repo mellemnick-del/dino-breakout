@@ -8,9 +8,15 @@ private final class Shot {
     let slow: (factor: CGFloat, duration: TimeInterval)?
     /// Flak bursts also hit flyers within this many squares.
     let splash: CGFloat
+    /// The kind of tower that fired it, for the end of game stats.
+    let source: BuildKind
     var done = false
 
-    init(node: SKSpriteNode, target: Dino, damage: CGFloat, slow: (factor: CGFloat, duration: TimeInterval)?, splash: CGFloat = 0) {
+    init(
+        node: SKSpriteNode, target: Dino, damage: CGFloat, slow: (factor: CGFloat, duration: TimeInterval)?,
+        splash: CGFloat = 0, source: BuildKind
+    ) {
+        self.source = source
         self.node = node
         self.target = target
         self.damage = damage
@@ -111,6 +117,13 @@ final class GameScene: SKScene {
     private var tutorial: Tutorial?
     /// Napalm patches burning on the ground.
     private var burns: [Burn] = []
+    /// Numbers for the end of game screen.
+    private var stats = GameStats()
+    /// One chopper strafing run per wave.
+    private var airstrikeReady = true
+    /// Waiting for the player to pick where the strike goes.
+    private var airstrikeArmed = false
+    private var airstrikeButton: SKNode?
 
     /// Waves to win: 50, or 20 for the daily challenge.
     private var waveGoal: Int {
@@ -210,6 +223,10 @@ final class GameScene: SKScene {
         tool = .build(.fence)
         hud.select(tool)
         burns = []
+        stats = GameStats()
+        airstrikeReady = true
+        airstrikeArmed = false
+        buildAirstrikeButton()
         tutorial = nil
         if level.id == Level.all.first?.id, challenge == nil, !endless, !Tutorial.hasFinished {
             let guide = Tutorial(size: size, topY: size.height - topHeight) { [weak self] step in
@@ -491,8 +508,25 @@ final class GameScene: SKScene {
         if let tutorial, tutorial.handleTap(at: touch.location(in: self)) {
             return
         }
+        if let button = airstrikeButton, button.calculateAccumulatedFrame().contains(touch.location(in: self)) {
+            toggleAirstrike()
+            return
+        }
+        if airstrikeArmed {
+            let point = touch.location(in: world)
+            if point.y > origin.y && point.y < origin.y + cellSize * CGFloat(rows) {
+                launchAirstrike(atY: point.y)
+                return
+            }
+        }
         if let panel = towerPanel {
             let hits = panel.nodes(at: touch.location(in: panel)).compactMap { $0.name }
+            if hits.contains("target"), let tower = selectedTower {
+                tower.targeting = tower.targeting.next
+                Haptics.tap()
+                showPanel(for: tower)
+                return
+            }
             if hits.contains("ability"), let tower = selectedTower {
                 useAbility(tower)
                 showPanel(for: tower)
@@ -746,13 +780,17 @@ final class GameScene: SKScene {
             award(.fastForward)
         }
         let bonus = 5 + min(wavesStarted, Waves.total)
-        cash += bonus
+        // 5% interest on cash you saved, up to $50, rewards banking for a big upgrade
+        let interest = min(50, cash / 20)
+        cash += bonus + interest
+        airstrikeReady = true
+        updateAirstrikeButton()
         tutorial?.handle(.waveCleared)
         if !endless && wavesStarted == waveGoal {
             endGame(won: true)
         } else {
             hud.setSendEnabled(true)
-            hud.flash("Wave cleared! +$\(bonus)")
+            hud.flash(interest > 0 ? "Wave cleared! +$\(bonus), +$\(interest) interest" : "Wave cleared! +$\(bonus)")
         }
     }
 
@@ -762,6 +800,7 @@ final class GameScene: SKScene {
         let dt = lastUpdate == 0 ? 0 : min(currentTime - lastUpdate, 1.0 / 20.0)
         lastUpdate = currentTime
         guard !isOver, pauseMenu == nil, dt > 0 else { return }
+        stats.playTime += dt
 
         // Faster speeds run extra steps so nothing skips past a tower
         for _ in 0..<gameSpeed where !isOver {
@@ -851,6 +890,20 @@ final class GameScene: SKScene {
         return f >= 1
     }
 
+    private func pickTarget(from candidates: [Dino], for tower: Tower) -> Dino? {
+        switch tower.targeting {
+        case .first:
+            return candidates.min { stepsLeft($0) < stepsLeft($1) }
+        case .strongest:
+            return candidates.max { $0.health < $1.health }
+        case .closest:
+            return candidates.min { distance($0.position, tower.position) < distance($1.position, tower.position) }
+        case .flyers:
+            let flyers = candidates.filter { $0.kind.flies }
+            return (flyers.isEmpty ? candidates : flyers).min { stepsLeft($0) < stepsLeft($1) }
+        }
+    }
+
     /// How close a dino is to the helipad, in squares. Towers shoot the closest first.
     private func stepsLeft(_ dino: Dino) -> CGFloat {
         if let flight = dino.flight {
@@ -879,9 +932,9 @@ final class GameScene: SKScene {
                 pulse(from: tower, radius: reach)
                 SoundBank.shared.play(.flare)
                 for dino in inRange {
-                    hit(dino, for: tower.damage)
+                    hit(dino, for: tower.damage, source: .flare)
                 }
-            } else if let target = inRange.min(by: { stepsLeft($0) < stepsLeft($1) }) {
+            } else if let target = pickTarget(from: inRange, for: tower) {
                 // Shoot whichever dino is closest to escaping.
                 tower.aim(at: target.position)
                 fire(from: tower, at: target)
@@ -908,7 +961,7 @@ final class GameScene: SKScene {
         node.position = CGPoint(x: tower.position.x + cos(angle) * cellSize * 0.45, y: tower.position.y + sin(angle) * cellSize * 0.45)
         node.zPosition = 7
         world.addChild(node)
-        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow, splash: tower.kind.splash))
+        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow, splash: tower.kind.splash, source: tower.kind))
     }
 
     private func moveShots(_ dt: TimeInterval) {
@@ -929,7 +982,7 @@ final class GameScene: SKScene {
                     let reach = shot.splash * cellSize
                     let center = shot.target.position
                     for other in dinos where other !== shot.target && other.kind.flies && distance(other.position, center) <= reach {
-                        hit(other, for: shot.damage * 0.5)
+                        hit(other, for: shot.damage * 0.5, source: .flak)
                     }
                 } else {
                     puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
@@ -937,7 +990,7 @@ final class GameScene: SKScene {
                 }
                 // Only flak is built for the sky; everything else does half damage to flyers
                 let airPenalty: CGFloat = shot.target.kind.flies && shot.splash == 0 ? 0.5 : 1
-                hit(shot.target, for: shot.damage * airPenalty, slow: shot.slow)
+                hit(shot.target, for: shot.damage * airPenalty, slow: shot.slow, source: shot.source)
                 shot.node.removeFromParent()
                 shot.done = true
             } else {
@@ -950,9 +1003,13 @@ final class GameScene: SKScene {
 
     private func hit(
         _ dino: Dino, for amount: CGFloat,
-        slow: (factor: CGFloat, duration: TimeInterval)? = nil, armorApplies: Bool = true
+        slow: (factor: CGFloat, duration: TimeInterval)? = nil, armorApplies: Bool = true, source: BuildKind? = nil
     ) {
         guard !dino.isDead else { return }
+        defer {
+            let dealt = armorApplies ? max(1, amount - dino.kind.armor) : amount
+            stats.damage[source.map { "\($0)" } ?? "airstrike", default: 0] += dealt
+        }
         if let slow {
             dino.slow(to: slow.factor, for: slow.duration)
         }
@@ -964,6 +1021,7 @@ final class GameScene: SKScene {
     }
 
     private func kill(_ dino: Dino) {
+        stats.kills += 1
         award(.firstBite)
         switch dino.kind {
         case .rex:
@@ -1051,13 +1109,18 @@ final class GameScene: SKScene {
         detail.position = CGPoint(x: 0, y: -8)
         overlay.addChild(detail)
 
+        let summary = makeLabel(stats.summary, size: 13, color: Palette.muted)
+        summary.position = CGPoint(x: 0, y: -34)
+        summary.setScale(min(1, (size.width - 24) / max(1, summary.frame.width)))
+        overlay.addChild(summary)
+
         if won && challenge == nil {
-            overlay.addChild(menuButton("Keep Going ∞", name: "endless", fill: Palette.warning, text: Palette.bar, outlined: false, y: -60))
-            overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.panel, text: Palette.text, outlined: true, y: -120))
-            overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -180))
+            overlay.addChild(menuButton("Keep Going ∞", name: "endless", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80))
+            overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
+            overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -200))
         } else {
-            overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -60))
-            overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -120))
+            overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80))
+            overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
         }
         gameOverOverlay = overlay
         SoundBank.shared.play(won ? .win : .lose)
@@ -1069,6 +1132,105 @@ final class GameScene: SKScene {
 
         overlay.alpha = 0
         overlay.run(.sequence([.wait(forDuration: won ? 1.2 : 0), .fadeIn(withDuration: 0.3)]))
+    }
+
+    // MARK: - Air strike
+
+    private func buildAirstrikeButton() {
+        let button = SKNode()
+        button.zPosition = 60
+        button.position = CGPoint(x: size.width - 38, y: bottomHeight + 70)
+        let ring = SKShapeNode(circleOfRadius: 27)
+        ring.name = "ring"
+        ring.lineWidth = 2.5
+        button.addChild(ring)
+        let icon = SKSpriteNode(texture: ParkArt.chopperBody(size: 30), size: CGSize(width: 42, height: 15))
+        icon.zRotation = .pi / 2
+        icon.position = CGPoint(x: 0, y: 4)
+        button.addChild(icon)
+        let label = makeLabel("STRIKE", size: 9, font: Fonts.heavy)
+        label.name = "label"
+        label.position = CGPoint(x: 0, y: -16)
+        button.addChild(label)
+        addChild(button)
+        airstrikeButton = button
+        updateAirstrikeButton()
+    }
+
+    private func updateAirstrikeButton() {
+        guard let button = airstrikeButton, let ring = button.childNode(withName: "ring") as? SKShapeNode else { return }
+        if airstrikeArmed {
+            ring.fillColor = Palette.danger
+            ring.strokeColor = .white
+        } else if airstrikeReady {
+            ring.fillColor = Palette.bar.withAlphaComponent(0.9)
+            ring.strokeColor = Palette.warning
+        } else {
+            ring.fillColor = Palette.bar.withAlphaComponent(0.6)
+            ring.strokeColor = Palette.muted
+        }
+        button.alpha = airstrikeReady ? 1 : 0.45
+    }
+
+    private func toggleAirstrike() {
+        guard airstrikeReady else {
+            hud.flash("Air strike is back after this wave")
+            return
+        }
+        airstrikeArmed.toggle()
+        Haptics.tap()
+        updateAirstrikeButton()
+        if airstrikeArmed {
+            hud.flash("Tap the board where the chopper should strafe")
+        }
+    }
+
+    /// The rescue chopper strafes a line straight across the board, hitting everything in it.
+    private func launchAirstrike(atY y: CGFloat) {
+        airstrikeArmed = false
+        airstrikeReady = false
+        updateAirstrikeButton()
+        Haptics.stomp()
+        SoundBank.shared.play(.alarm, volume: 0.6)
+
+        let left = origin.x - cellSize * 1.5
+        let right = origin.x + cellSize * CGFloat(cols) + cellSize * 1.5
+        let band = cellSize * 0.75
+        let heli = SKNode()
+        heli.zPosition = 12
+        heli.position = CGPoint(x: left, y: y)
+        let s = cellSize * 1.2
+        heli.addChild(SKSpriteNode(texture: ParkArt.chopperBody(size: s), size: CGSize(width: s * 1.4, height: s * 0.5)))
+        let rotor = SKSpriteNode(texture: ParkArt.rotor(size: s), size: CGSize(width: s * 1.16, height: s * 1.16))
+        rotor.zPosition = 1
+        rotor.run(.repeatForever(.rotate(byAngle: -.pi * 2, duration: 0.2)))
+        heli.addChild(rotor)
+        world.addChild(heli)
+
+        let line = SKShapeNode(rectOf: CGSize(width: right - left, height: band * 2))
+        line.position = CGPoint(x: (left + right) / 2, y: y)
+        line.fillColor = SKColor(red: 1, green: 0.85, blue: 0.4, alpha: 0.12)
+        line.strokeColor = SKColor(red: 1, green: 0.85, blue: 0.4, alpha: 0.5)
+        line.zPosition = 7
+        world.addChild(line)
+        line.run(.sequence([.wait(forDuration: 1.2), .fadeOut(withDuration: 0.3), .removeFromParent()]))
+
+        let duration: TimeInterval = 1.1
+        heli.run(.sequence([.moveTo(x: right, duration: duration), .removeFromParent()]))
+        let damage = 45 * Waves.healthScale(forWave: max(0, wavesStarted - 1)) * difficulty.health
+        let steps = 10
+        for i in 0..<steps {
+            let x = left + (right - left) * CGFloat(i) / CGFloat(steps - 1)
+            run(.wait(forDuration: duration * Double(i) / Double(steps))) { [weak self] in
+                guard let self else { return }
+                SoundBank.shared.play(.turret)
+                self.puff(at: CGPoint(x: x, y: y + CGFloat.random(in: -band...band)), color: UIColor(hex: 0xFFE27A))
+                let sliceWidth = (right - left) / CGFloat(steps)
+                for dino in self.dinos where abs(dino.position.y - y) <= band && abs(dino.position.x - x) <= sliceWidth {
+                    self.hit(dino, for: damage / 2)
+                }
+            }
+        }
     }
 
     // MARK: - Tower abilities
@@ -1139,7 +1301,7 @@ final class GameScene: SKScene {
         for burn in burns {
             burn.timeLeft -= dt
             for dino in dinos where !dino.kind.flies && distance(dino.position, burn.center) <= burn.radius {
-                hit(dino, for: burn.damagePerSecond * CGFloat(dt), armorApplies: false)
+                hit(dino, for: burn.damagePerSecond * CGFloat(dt), armorApplies: false, source: .flare)
             }
             if burn.timeLeft <= 0 {
                 burn.node.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()]))
@@ -1161,7 +1323,7 @@ final class GameScene: SKScene {
                 guard let self, let dino, !dino.isDead else { return }
                 self.flakBurst(at: dino.position)
                 SoundBank.shared.play(.flak)
-                self.hit(dino, for: tower.damage * 3)
+                self.hit(dino, for: tower.damage * 3, source: .flak)
             }
         }
     }
@@ -1274,9 +1436,18 @@ final class GameScene: SKScene {
         let title = tower.kind == .fence
             ? "Electric fence"
             : "\(tower.kind.title)  ·  Level \(tower.level) of \(Tower.maxLevel)"
-        let titleLabel = makeLabel(title, size: 15, font: Fonts.heavy)
+        let titleY: CGFloat = hasAbility ? 52 : 26
+        let aims = tower.kind != .fence && tower.kind != .flare
+        let titleLabel = makeLabel(aims ? "\(tower.kind.title) · Lv \(tower.level)/\(Tower.maxLevel)" : title, size: aims ? 14 : 15, font: Fonts.heavy)
         titleLabel.name = "panel"
-        titleLabel.position = CGPoint(x: 0, y: hasAbility ? 52 : 26)
+        if aims {
+            titleLabel.horizontalAlignmentMode = .left
+            titleLabel.position = CGPoint(x: -width / 2 + 14, y: titleY)
+            panel.addChild(menuButton("Aim: \(tower.targeting.title)", name: "target", fill: Palette.panel, text: Palette.warning,
+                                      outlined: true, x: width / 2 - 12 - 46, y: titleY, width: 92, height: 28, fontSize: 11))
+        } else {
+            titleLabel.position = CGPoint(x: 0, y: titleY)
+        }
         panel.addChild(titleLabel)
 
         let sellTitle = "Sell $\(tower.sellValue)"

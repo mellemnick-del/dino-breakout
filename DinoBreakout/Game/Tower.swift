@@ -111,6 +111,25 @@ enum BuildKind: CaseIterable {
     }
 }
 
+/// Which dino in range a tower shoots first.
+enum Targeting: CaseIterable {
+    case first, strongest, closest, flyers
+
+    var title: String {
+        switch self {
+        case .first: "First"
+        case .strongest: "Strongest"
+        case .closest: "Closest"
+        case .flyers: "Flyers"
+        }
+    }
+
+    var next: Targeting {
+        let all = Targeting.allCases
+        return all[(all.firstIndex(of: self)! + 1) % all.count]
+    }
+}
+
 /// Anything you build. Every tower is also a wall, so it shapes the maze.
 final class Tower: SKNode {
     static let maxLevel = 5
@@ -120,6 +139,8 @@ final class Tower: SKNode {
     private(set) var level = 1
     private(set) var invested: Int
     var cooldown: TimeInterval = 0
+    /// Which dino in range this tower shoots first.
+    var targeting: Targeting = .first
     /// Seconds until the special ability is ready again.
     var abilityCooldown: TimeInterval = 0
     /// Seconds of turret overdrive left.
