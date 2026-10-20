@@ -19,9 +19,23 @@ struct Level: Identifiable, Hashable {
     var water: [Cell] = []
     /// Ground squares drawn as planks across the river. You can build on them.
     var bridges: [Cell] = []
+    /// Lava pools. Nothing can walk through or build on them.
+    var lava: [Cell] = []
+    /// Park buildings. Nothing can walk through or build on them.
+    var buildings: [Cell] = []
+    /// Volcanic ash instead of grass.
+    var ash = false
+    /// Pterodactyls on almost every wave, starting early.
+    var flyerHeavy = false
 
     var terrain: Set<Cell> {
-        Set(rocks + water)
+        Set(rocks + water + lava + buildings)
+    }
+
+    /// The park before this one in the list, which unlocks it.
+    var previous: Level? {
+        guard let index = Level.all.firstIndex(of: self), index > 0 else { return nil }
+        return Level.all[index - 1]
     }
 
     static let all: [Level] = [
@@ -53,6 +67,42 @@ struct Level: Identifiable, Hashable {
             exit: Cell(col: 4, row: 0),
             water: [0, 2, 3, 4, 5, 6, 8].map { Cell(col: $0, row: 6) },
             bridges: [Cell(col: 1, row: 6), Cell(col: 7, row: 6)]
+        ),
+        Level(
+            id: "visitor-center",
+            name: "Visitor Center",
+            blurb: "The dinos are loose in the tourist area. Maze them around the buildings.",
+            spawn: Cell(col: 0, row: 12),
+            exit: Cell(col: 8, row: 0),
+            buildings: [
+                Cell(col: 2, row: 9), Cell(col: 3, row: 9), Cell(col: 2, row: 8), Cell(col: 3, row: 8),
+                Cell(col: 6, row: 10), Cell(col: 7, row: 10),
+                Cell(col: 5, row: 6), Cell(col: 6, row: 6), Cell(col: 5, row: 5), Cell(col: 6, row: 5),
+                Cell(col: 1, row: 4), Cell(col: 1, row: 3),
+                Cell(col: 3, row: 2), Cell(col: 4, row: 2)
+            ]
+        ),
+        Level(
+            id: "aviary",
+            name: "The Aviary",
+            blurb: "Someone left the aviary open. Pterodactyls from wave 3.",
+            spawn: Cell(col: 4, row: 12),
+            exit: Cell(col: 4, row: 0),
+            rocks: [Cell(col: 1, row: 10), Cell(col: 7, row: 10), Cell(col: 4, row: 6), Cell(col: 1, row: 2), Cell(col: 7, row: 2)],
+            flyerHeavy: true
+        ),
+        Level(
+            id: "mount-ember",
+            name: "Mount Ember",
+            blurb: "Lava pools on the slopes of a waking volcano. The hardest park.",
+            spawn: Cell(col: 4, row: 12),
+            exit: Cell(col: 4, row: 0),
+            lava: [
+                Cell(col: 1, row: 9), Cell(col: 2, row: 9), Cell(col: 6, row: 9), Cell(col: 7, row: 9),
+                Cell(col: 3, row: 6), Cell(col: 4, row: 6), Cell(col: 5, row: 6),
+                Cell(col: 0, row: 3), Cell(col: 1, row: 3), Cell(col: 7, row: 3), Cell(col: 8, row: 3)
+            ],
+            ash: true
         )
     ]
 }
@@ -115,6 +165,27 @@ enum Difficulty: String, CaseIterable, Identifiable {
 
 /// Best wave cleared, per park and difficulty, saved on the device.
 enum Progress {
+    /// Wave you need to reach on a park to unlock the next one.
+    static let unlockWave = 10
+
+    /// One star at wave 10, two at wave 25, three for beating all 50.
+    static func stars(forBest wave: Int) -> Int {
+        if wave >= Waves.total { return 3 }
+        if wave >= 25 { return 2 }
+        if wave >= 10 { return 1 }
+        return 0
+    }
+
+    /// A park unlocks once you reach wave 10 on the park before it, on any difficulty.
+    static func isUnlocked(_ level: Level) -> Bool {
+        guard let previous = level.previous else { return true }
+        return Difficulty.allCases.contains { best(level: previous, difficulty: $0) >= unlockWave }
+    }
+
+    static func totalStars(difficulty: Difficulty) -> Int {
+        Level.all.reduce(0) { $0 + stars(forBest: best(level: $1, difficulty: difficulty)) }
+    }
+
     static func best(level: Level, difficulty: Difficulty) -> Int {
         UserDefaults.standard.integer(forKey: key(level, difficulty))
     }

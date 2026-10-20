@@ -52,7 +52,16 @@ enum Waves {
     /// The lineup for a wave, numbered from 1. After the opening ten, waves
     /// rotate through swarms, raptor rushes, triceratops columns, and mixed
     /// packs, growing as they go. Every tenth wave is a T-Rex boss wave.
-    static func groups(forWave number: Int) -> [SpawnGroup] {
+    static func groups(forWave number: Int, flyerHeavy: Bool = false) -> [SpawnGroup] {
+        var groups = baseGroups(forWave: number)
+        // Parks like the Aviary add a flock to nearly every wave from wave 3
+        if flyerHeavy && number >= 3 && !groups.contains(where: { $0.kind == .pterodactyl }) {
+            groups.append(SpawnGroup(kind: .pterodactyl, count: 2 + number / 3, every: 1.0, startAt: 3))
+        }
+        return groups
+    }
+
+    private static func baseGroups(forWave number: Int) -> [SpawnGroup] {
         if number <= opening.count {
             return opening[max(0, number - 1)]
         }

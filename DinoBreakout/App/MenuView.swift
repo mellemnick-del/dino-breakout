@@ -14,6 +14,9 @@ enum MenuColor {
     static let water = Color(red: 0.18, green: 0.43, blue: 0.56)
     static let gate = Color(red: 0.6, green: 0.22, blue: 0.15)
     static let pad = Color(red: 0.42, green: 0.44, blue: 0.41)
+    static let ash = Color(red: 0.24, green: 0.23, blue: 0.21)
+    static let lava = Color(red: 0.95, green: 0.45, blue: 0.12)
+    static let roof = Color(red: 0.72, green: 0.69, blue: 0.62)
 }
 
 struct MenuView: View {
@@ -123,14 +126,23 @@ struct MenuView: View {
 
     private var parks: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel("CHOOSE A PARK")
+            HStack {
+                sectionLabel("CHOOSE A PARK")
+                Spacer()
+                Label("\(Progress.totalStars(difficulty: difficulty)) of \(Level.all.count * 3)", systemImage: "star.fill")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(MenuColor.hazard)
+                    .accessibilityLabel("\(Progress.totalStars(difficulty: difficulty)) stars on \(difficulty.title)")
+            }
             ForEach(Level.all) { level in
+                let unlocked = Progress.isUnlocked(level)
                 Button {
                     onPlay(level, difficulty)
                 } label: {
-                    ParkCard(level: level, best: Progress.best(level: level, difficulty: difficulty))
+                    ParkCard(level: level, best: Progress.best(level: level, difficulty: difficulty), locked: !unlocked)
                 }
                 .buttonStyle(.plain)
+                .disabled(!unlocked)
             }
             HStack(spacing: 12) {
                 Image(systemName: "lock.fill")
@@ -158,37 +170,59 @@ struct MenuView: View {
 private struct ParkCard: View {
     let level: Level
     let best: Int
+    let locked: Bool
 
     var body: some View {
         HStack(spacing: 14) {
             ParkMap(level: level)
                 .frame(width: 52, height: 82)
+                .opacity(locked ? 0.4 : 1)
             VStack(alignment: .leading, spacing: 4) {
                 Text(level.name)
                     .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MenuColor.text)
+                    .foregroundStyle(locked ? MenuColor.muted : MenuColor.text)
                 Text(level.blurb)
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(MenuColor.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(best > 0 ? "Best: wave \(best) of \(Waves.total)" : "Not played yet")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundStyle(best > 0 ? MenuColor.hazard : MenuColor.muted)
+                if locked, let previous = level.previous {
+                    Text("Reach wave \(Progress.unlockWave) in \(previous.name) to unlock")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(MenuColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 2)
+                } else {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 2) {
+                            ForEach(0..<3, id: \.self) { i in
+                                Image(systemName: i < Progress.stars(forBest: best) ? "star.fill" : "star")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(i < Progress.stars(forBest: best) ? MenuColor.hazard : MenuColor.muted)
+                            }
+                        }
+                        Text(best > 0 ? "Best: wave \(best)" : "Not played yet")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundStyle(best > 0 ? MenuColor.hazard : MenuColor.muted)
+                    }
                     .padding(.top, 2)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(Progress.stars(forBest: best)) of 3 stars, best wave \(best)")
+                }
             }
             Spacer(minLength: 4)
-            Image(systemName: "play.fill")
+            Image(systemName: locked ? "lock.fill" : "play.fill")
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(MenuColor.hazardInk)
+                .foregroundStyle(locked ? MenuColor.muted : MenuColor.hazardInk)
                 .frame(width: 40, height: 40)
-                .background(MenuColor.hazard, in: Circle())
+                .background(locked ? MenuColor.panel : MenuColor.hazard, in: Circle())
+                .overlay(Circle().stroke(locked ? MenuColor.line : .clear))
         }
         .padding(14)
         .background(MenuColor.panel.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(MenuColor.line))
         .contentShape(RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Starts this park")
+        .accessibilityHint(locked ? "Locked" : "Starts this park")
     }
 }
 
@@ -202,7 +236,13 @@ private struct ParkMap: View {
             func rect(_ cell: Cell) -> CGRect {
                 CGRect(x: CGFloat(cell.col) * c, y: CGFloat(Level.rows - 1 - cell.row) * c, width: c, height: c)
             }
-            context.fill(Path(CGRect(x: 0, y: 0, width: c * CGFloat(Level.cols), height: c * CGFloat(Level.rows))), with: .color(MenuColor.grass))
+            context.fill(Path(CGRect(x: 0, y: 0, width: c * CGFloat(Level.cols), height: c * CGFloat(Level.rows))), with: .color(level.ash ? MenuColor.ash : MenuColor.grass))
+            for cell in level.lava {
+                context.fill(Path(rect(cell)), with: .color(MenuColor.lava))
+            }
+            for cell in level.buildings {
+                context.fill(Path(rect(cell)), with: .color(MenuColor.roof))
+            }
             for cell in level.water {
                 context.fill(Path(rect(cell)), with: .color(MenuColor.water))
             }

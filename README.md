@@ -13,7 +13,8 @@ A mazing tower defense game for iPhone. The park's power has failed and the dino
 The game opens on a title screen with dinos roaming the park behind it.
 
 - **Difficulty:** Easy (30 lives, $150), Medium (20 lives, $100), or Hard (10 lives, $80, tougher dinos, smaller bounties).
-- **Parks:** Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), and Jungle River (a river with two bridges). Each card shows your best wave for the chosen difficulty.
+- **Parks**, in unlock order: Paddock B (open field), Raptor Ridge (boulders, gate and helipad in opposite corners), Jungle River (a river with two bridges), Visitor Center (buildings to maze around), The Aviary (pterodactyls from wave 3), and Mount Ember (lava pools on volcanic ash). Each park unlocks when you reach wave 10 on the one before it, on any difficulty.
+- **Stars:** one at wave 10, two at wave 25, three for beating all 50, tracked per park and difficulty. Each card shows its stars and best wave, and the header shows your total.
 - **Settings** (gear): separate Music and Sound effects volume. All audio is synthesized in code (`Sound.swift`), and it follows the phone's silent switch.
 
 New parks are added in `Level.swift`: a gate square, a helipad square, and any boulders, river squares, and bridges.
@@ -23,9 +24,10 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 - Dinos break out of the **paddock gate** 🚧 at the top and run for the **helipad** 🚁 at the bottom.
 - Pick something from the build bar, then tap an empty square to place it.
 - You can never fully block the path. If a placement would seal the dinos in, it's refused.
-- Tap any tower you built to open its panel: its level (1 of 3, also shown as rank chevrons), an **Upgrade** button with the price, **Sell** for 70% back, and its range.
+- Tap any tower you built to open its panel: its level (1 of 5, also shown as rank chevrons; levels 4 and 5 add gold trim, and level 5 a gold star), an **Upgrade** button with the price, **Sell** for 70% back, and its range.
 - Or pick **Sell** in the build bar and tap towers to sell them quickly.
 - Tap **Send Wave** when your maze is ready. Clearing a wave pays a bonus.
+- While a wave is running, the same button is the speed toggle: 1x, 2x, 3x.
 - Survive 50 waves to win. Every tenth wave is a T-Rex boss wave, with one more T-Rex each time.
 - Tap the pause button (top left) to pause, resume, or restart from wave 1.
 
@@ -99,6 +101,23 @@ All the numbers live in a few obvious places:
 - Upgrade scaling and sell value: `Tower` in `Tower.swift`
 - Wave lineups and health scaling per wave: `Waves.swift`
 - Starting cash, lives, and board size: top of `GameScene.swift`
+
+## Get it on TestFlight
+
+TestFlight lets you (and your family) install the game from Apple's TestFlight app instead of plugging a phone into Xcode. The app icon, bundle ID (`com.zeroday.dinobreakout`), and export compliance answer are already set up.
+
+1. **Join the Apple Developer Program** at developer.apple.com/programs ($99 a year). Approval can take up to 48 hours.
+2. **Sign in to Xcode** with that Apple ID: Xcode, Settings, Accounts, then the + button.
+3. **Pick your team:** click the blue DinoBreakout project icon, select the DinoBreakout target, open **Signing & Capabilities**, and choose your team. If Xcode says the bundle ID is taken, change it (for example to `com.zeroday.dinobreakout2`).
+4. **Create the app record** at appstoreconnect.apple.com: Apps, the + button, New App. Platform iOS, name **Dino Breakout: Tower Defense** (if the name is taken, try another), your bundle ID from step 3, and any SKU such as `dinobreakout`.
+5. **Upload a build:** in Xcode, set the run destination at the top to **Any iOS Device (arm64)**, then Product, Archive. When the Organizer window opens, click **Distribute App**, choose **App Store Connect**, and follow the prompts to upload.
+6. **Wait for processing** (usually 10 to 30 minutes). The build shows up under the app's **TestFlight** tab.
+7. **Add testers:**
+   - **You:** add yourself under Internal Testing.
+   - **Family:** either add them in **Users and Access** so they can be internal testers too (fastest), or create an **External Testing** group, add their email, and submit the build for a short beta review (usually about a day).
+8. **Install:** each tester gets an email invite, installs the free **TestFlight** app, and taps Accept.
+
+For every new upload, raise the **Build** number (target, General tab) before archiving, or App Store Connect will reject it.
 
 ## Roadmap
 

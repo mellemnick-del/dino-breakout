@@ -87,7 +87,7 @@ enum BuildKind: CaseIterable {
 
 /// Anything you build. Every tower is also a wall, so it shapes the maze.
 final class Tower: SKNode {
-    static let maxLevel = 3
+    static let maxLevel = 5
 
     let kind: BuildKind
     let cell: Cell

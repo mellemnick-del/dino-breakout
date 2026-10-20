@@ -30,6 +30,8 @@ enum ParkArt {
     static let oliveLight = UIColor(hex: 0x8A9A55)
     static let oliveDark = UIColor(hex: 0x3E4A24)
     static let marking = UIColor(hex: 0xC0392B)
+    static let gold = UIColor(hex: 0xE8B53A)
+    static let goldLight = UIColor(hex: 0xFFE08A)
     static let glass = UIColor(hex: 0x9FD3F0)
     static let hull = UIColor(hex: 0xECE8DC)
     static let rescue = UIColor(hex: 0xE2593F)
@@ -47,12 +49,12 @@ enum ParkArt {
 
     // MARK: - Textures
 
-    static func ground(cols: Int, rows: Int, cell c: CGFloat) -> SKTexture {
+    static func ground(cols: Int, rows: Int, cell c: CGFloat, ash: Bool = false) -> SKTexture {
         let size = CGSize(width: CGFloat(cols) * c, height: CGFloat(rows) * c)
-        return texture("ground-\(cols)-\(rows)-\(Int(c))", size: size, centered: false) { ctx in
+        return texture("ground-\(cols)-\(rows)-\(ash)-\(Int(c))", size: size, centered: false) { ctx in
             for col in 0..<cols {
                 for row in 0..<rows {
-                    drawGrassTile(ctx, col: CGFloat(col), row: CGFloat(row), cell: c, odd: (col + row) % 2 == 1)
+                    drawGrassTile(ctx, col: CGFloat(col), row: CGFloat(row), cell: c, odd: (col + row) % 2 == 1, ash: ash)
                 }
             }
         }
@@ -96,7 +98,7 @@ enum ParkArt {
     /// Where each barrel ends, along the head's local y axis.
     static func muzzles(_ kind: BuildKind, level: Int, cell c: CGFloat) -> [CGFloat] {
         switch (kind, level) {
-        case (.tranq, 3): [-c * 0.045, c * 0.045]
+        case (.tranq, 3...): [-c * 0.045, c * 0.045]
         case (.turret, 2): [-c * 0.07, c * 0.07]
         case (.tranq, _), (.turret, _): [0]
         case (.flak, 1): [-c * 0.06, c * 0.06]
@@ -401,6 +403,64 @@ enum ParkArt {
         }
     }
 
+    /// A lava pool square, glowing. Three frames.
+    static func lava(cell c: CGFloat, frame: Int) -> SKTexture {
+        texture("lava-\(frame)-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
+            ctx.setFillColor(UIColor(hex: 0x8E1E0E).cgColor)
+            ctx.fill(CGRect(x: -c / 2, y: -c / 2, width: c + 0.5, height: c + 0.5))
+            for k in 0..<4 {
+                let fk = CGFloat(k)
+                let x = (hash(fk, 7) - 0.5) * c * 0.7
+                let y = (hash(9, fk) - 0.5) * c * 0.7
+                let pulse = 0.5 + 0.5 * sin(CGFloat(frame) * 2.1 + fk * 1.3)
+                let r = c * (0.14 + 0.08 * pulse)
+                ctx.addEllipse(in: CGRect(x: x - r, y: y - r * 0.8, width: r * 2, height: r * 1.6))
+                fill(ctx, UIColor(hex: 0xFF7A1A), 0.85)
+                circle(ctx, x, y, r * 0.45)
+                fill(ctx, UIColor(hex: 0xFFD25A))
+            }
+            ctx.setStrokeColor(UIColor(hex: 0x3A120A).cgColor)
+            ctx.setLineWidth(max(1.2, c * 0.03))
+            for k in 0..<2 {
+                let y = (hash(CGFloat(k), 3) - 0.5) * c * 0.6
+                ctx.move(to: CGPoint(x: -c * 0.4, y: y))
+                ctx.addQuadCurve(to: CGPoint(x: c * 0.4, y: y + c * 0.08), control: CGPoint(x: 0, y: y - c * 0.1))
+            }
+            ctx.strokePath()
+        }
+    }
+
+    /// A rooftop square of a park building, with a vent or skylight.
+    static func building(cell c: CGFloat, variant: Int) -> SKTexture {
+        texture("roof-\(variant)-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
+            let lw = lineWidth(c)
+            ctx.setFillColor(shadow.withAlphaComponent(0.35).cgColor)
+            ctx.fill(CGRect(x: -c / 2 + c * 0.05, y: -c / 2 + c * 0.07, width: c, height: c))
+            rr(ctx, -c * 0.48, -c * 0.48, c * 0.96, c * 0.96, c * 0.04)
+            ink(ctx, UIColor(hex: 0xB9B2A2), lw)
+            rr(ctx, -c * 0.4, -c * 0.4, c * 0.8, c * 0.8, c * 0.03)
+            fill(ctx, UIColor(hex: 0xA59E8E))
+            switch variant % 3 {
+            case 0:
+                rr(ctx, -c * 0.2, -c * 0.16, c * 0.4, c * 0.32, c * 0.04)
+                ink(ctx, steelLight, lw)
+                for i in 0..<3 {
+                    line(ctx, CGPoint(x: -c * 0.14 + CGFloat(i) * c * 0.14, y: -c * 0.12), CGPoint(x: -c * 0.14 + CGFloat(i) * c * 0.14, y: c * 0.12), steelDark, lw)
+                }
+            case 1:
+                rr(ctx, -c * 0.22, -c * 0.22, c * 0.44, c * 0.44, c * 0.04)
+                ink(ctx, glass, lw)
+                line(ctx, CGPoint(x: -c * 0.22, y: 0), CGPoint(x: c * 0.22, y: 0), outline, lw)
+                line(ctx, CGPoint(x: 0, y: -c * 0.22), CGPoint(x: 0, y: c * 0.22), outline, lw)
+            default:
+                circle(ctx, 0, 0, c * 0.17)
+                ink(ctx, steel, lw)
+                circle(ctx, 0, 0, c * 0.07)
+                fill(ctx, steelDark)
+            }
+        }
+    }
+
     /// Wooden planks laid over a river crossing.
     static func bridge(cell c: CGFloat) -> SKTexture {
         texture("bridge-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
@@ -546,7 +606,27 @@ enum ParkArt {
         text.draw(at: CGPoint(x: -size.width / 2, y: -size.height / 2), withAttributes: attrs)
     }
 
-    private static func drawGrassTile(_ ctx: CGContext, col: CGFloat, row: CGFloat, cell c: CGFloat, odd: Bool) {
+    private static func drawGrassTile(_ ctx: CGContext, col: CGFloat, row: CGFloat, cell c: CGFloat, odd: Bool, ash: Bool) {
+        if ash {
+            ctx.setFillColor(UIColor(hex: odd ? 0x3A3833 : 0x423F38).cgColor)
+            ctx.fill(CGRect(x: col * c, y: row * c, width: c + 0.5, height: c + 0.5))
+            for k in 0..<3 {
+                let fk = CGFloat(k)
+                circle(ctx, (col + 0.15 + hash(col * 3 + fk, row) * 0.7) * c, (row + 0.15 + hash(row * 5 + fk, col) * 0.7) * c, c * (0.025 + 0.02 * hash(fk, col + row)))
+                fill(ctx, UIColor(hex: 0x5A564C))
+            }
+            if hash(col * 7, row * 11) > 0.8 {
+                let x = (col + 0.3 + hash(row, col) * 0.4) * c
+                let y = (row + 0.3 + hash(col, row * 3) * 0.4) * c
+                ctx.move(to: CGPoint(x: x - c * 0.12, y: y))
+                ctx.addLine(to: CGPoint(x: x, y: y + c * 0.05))
+                ctx.addLine(to: CGPoint(x: x + c * 0.1, y: y - c * 0.04))
+                ctx.setStrokeColor(UIColor(hex: 0xC2461F).withAlphaComponent(0.7).cgColor)
+                ctx.setLineWidth(max(1.2, c * 0.025))
+                ctx.strokePath()
+            }
+            return
+        }
         ctx.setFillColor((odd ? grassA : grassB).cgColor)
         ctx.fill(CGRect(x: col * c, y: row * c, width: c + 0.5, height: c + 0.5))
         ctx.setStrokeColor(tuft.cgColor)
@@ -653,6 +733,17 @@ enum ParkArt {
             fill(ctx, concreteDark)
         }
 
+        if level >= 4 {
+            rr(ctx, -h + lw * 1.5, -h + lw * 1.5, p - lw * 3, p - lw * 3, rad * 0.8)
+            ctx.setStrokeColor(gold.cgColor)
+            ctx.setLineWidth(lw * 1.3)
+            ctx.strokePath()
+        }
+        if level >= 5 {
+            circle(ctx, h - p * 0.1, -(h - p * 0.1), c * 0.04)
+            ink(ctx, goldLight, lw * 0.7)
+        }
+
         // Rank chevrons, one per level, like sergeant stripes
         let w = c * 0.075
         let gap = c * 0.055
@@ -679,6 +770,34 @@ enum ParkArt {
         case .flak: drawFlakHead(ctx, level: level, cell: c)
         case .fence: break
         }
+        if level >= 4 && kind != .fence {
+            drawEliteBadge(ctx, kind, level: level, cell: c)
+        }
+    }
+
+    /// Gold ring at level 4, plus a gold star at level 5.
+    private static func drawEliteBadge(_ ctx: CGContext, _ kind: BuildKind, level: Int, cell c: CGFloat) {
+        let lw = lineWidth(c)
+        let ring = kind == .flare ? c * 0.29 : c * 0.1
+        circle(ctx, kind == .flare ? 0 : -c * 0.02, 0, ring)
+        ctx.setStrokeColor(outline.cgColor)
+        ctx.setLineWidth(lw * 2.6)
+        ctx.strokePath()
+        circle(ctx, kind == .flare ? 0 : -c * 0.02, 0, ring)
+        ctx.setStrokeColor(gold.cgColor)
+        ctx.setLineWidth(lw * 1.3)
+        ctx.strokePath()
+        guard level >= 5 else { return }
+        let r = c * 0.075
+        let center = CGPoint(x: kind == .flare ? 0 : -c * 0.02, y: 0)
+        for i in 0..<10 {
+            let a = CGFloat(i) * .pi / 5 - .pi / 2
+            let rad = i % 2 == 0 ? r : r * 0.45
+            let pt = CGPoint(x: center.x + cos(a) * rad, y: center.y + sin(a) * rad)
+            if i == 0 { ctx.move(to: pt) } else { ctx.addLine(to: pt) }
+        }
+        ctx.closePath()
+        ink(ctx, goldLight, lw * 0.8)
     }
 
     private static func drawTranqHead(_ ctx: CGContext, level: Int, cell c: CGFloat) {

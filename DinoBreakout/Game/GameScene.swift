@@ -71,6 +71,8 @@ final class GameScene: SKScene {
     private var sparkTimer: TimeInterval = 1
     /// Whether this game has warned about flyers yet.
     private var warnedAboutFlyers = false
+    /// 1x, 2x, or 3x, toggled with the wave button while a wave is running.
+    private var gameSpeed = 1
     /// Showing while the game is paused.
     private var pauseMenu: SKNode?
     /// Showing once the game is won or lost.
@@ -127,6 +129,8 @@ final class GameScene: SKScene {
         wireLayer.removeAllActions()
         pauseMenu = nil
         world.isPaused = false
+        gameSpeed = 1
+        world.speed = 1
 
         let available = size.height - topHeight - bottomHeight
         cellSize = floor(min(size.width / CGFloat(cols), available / CGFloat(rows)))
@@ -154,7 +158,7 @@ final class GameScene: SKScene {
 
     private func drawBoard() {
         let boardSize = CGSize(width: cellSize * CGFloat(cols), height: cellSize * CGFloat(rows))
-        let ground = SKSpriteNode(texture: ParkArt.ground(cols: cols, rows: rows, cell: cellSize), size: boardSize)
+        let ground = SKSpriteNode(texture: ParkArt.ground(cols: cols, rows: rows, cell: cellSize, ash: level.ash), size: boardSize)
         ground.anchorPoint = .zero
         ground.position = origin
         world.addChild(ground)
@@ -187,6 +191,21 @@ final class GameScene: SKScene {
             bridge.position = point(for: cell)
             bridge.zPosition = 0.3
             world.addChild(bridge)
+        }
+        for cell in level.lava {
+            let frames = (0..<3).map { ParkArt.lava(cell: cellSize, frame: $0) }
+            let lava = SKSpriteNode(texture: frames[0], size: square)
+            lava.position = point(for: cell)
+            lava.zPosition = 0.3
+            lava.run(.repeatForever(.animate(with: frames, timePerFrame: 0.35)))
+            world.addChild(lava)
+        }
+        for cell in level.buildings {
+            let variant = Int(ParkArt.hash(CGFloat(cell.col) + 1, CGFloat(cell.row) + 2) * 3)
+            let roof = SKSpriteNode(texture: ParkArt.building(cell: cellSize, variant: variant), size: square)
+            roof.position = point(for: cell)
+            roof.zPosition = 2
+            world.addChild(roof)
         }
         for cell in level.rocks {
             let variant = Int(ParkArt.hash(CGFloat(cell.col) + 3, CGFloat(cell.row)) * 3)
@@ -415,7 +434,11 @@ final class GameScene: SKScene {
             case .pause:
                 openPauseMenu()
             case .sendWave:
-                sendWave()
+                if waveActive {
+                    cycleSpeed()
+                } else {
+                    sendWave()
+                }
             case .pick(let picked):
                 tool = picked
                 hud.select(tool)
@@ -442,7 +465,15 @@ final class GameScene: SKScene {
             return
         }
         if grid.terrain.contains(cell) {
-            hud.flash(level.water.contains(cell) ? "Can't build in the river" : "Can't build on a boulder")
+            if level.water.contains(cell) {
+                hud.flash("Can't build in the river")
+            } else if level.lava.contains(cell) {
+                hud.flash("Can't build on lava")
+            } else if level.buildings.contains(cell) {
+                hud.flash("Can't build on a building")
+            } else {
+                hud.flash("Can't build on a boulder")
+            }
             return
         }
         if cell == grid.spawn || cell == grid.exit {
@@ -511,16 +542,22 @@ final class GameScene: SKScene {
 
     private func sendWave() {
         guard !waveActive, !isOver, wavesStarted < Waves.total else { return }
-        let wave = Waves.groups(forWave: wavesStarted + 1)
+        let wave = Waves.groups(forWave: wavesStarted + 1, flyerHeavy: level.flyerHeavy)
         wavesStarted += 1
         spawnQueue = Waves.schedule(wave)
         waveClock = 0
         waveActive = true
         hud.setWave(wavesStarted, of: Waves.total)
-        hud.setSendEnabled(false, title: "Incoming")
+        hud.setSpeed(gameSpeed)
         setGate(open: true)
         SoundBank.shared.play(.alarm)
         hud.flash("Wave \(wavesStarted): \(Waves.summary(wave))")
+    }
+
+    private func cycleSpeed() {
+        gameSpeed = gameSpeed % 3 + 1
+        world.speed = CGFloat(gameSpeed)
+        hud.setSpeed(gameSpeed)
     }
 
     private func spawnDue(_ dt: TimeInterval) {
@@ -583,12 +620,15 @@ final class GameScene: SKScene {
         lastUpdate = currentTime
         guard !isOver, pauseMenu == nil, dt > 0 else { return }
 
-        spawnDue(dt)
-        moveDinos(dt)
-        fireTowers(dt)
-        moveShots(dt)
-        sparkFences(dt)
-        checkWaveEnd()
+        // Faster speeds run extra steps so nothing skips past a tower
+        for _ in 0..<gameSpeed where !isOver {
+            spawnDue(dt)
+            moveDinos(dt)
+            fireTowers(dt)
+            moveShots(dt)
+            sparkFences(dt)
+            checkWaveEnd()
+        }
     }
 
     private func moveDinos(_ dt: TimeInterval) {

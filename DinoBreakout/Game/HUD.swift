@@ -152,6 +152,13 @@ final class HUD: SKNode {
         sendLabel.fontColor = enabled ? Palette.bar : Palette.muted
     }
 
+    /// During a wave the Send Wave button becomes the speed toggle.
+    func setSpeed(_ speed: Int) {
+        sendLabel.text = "Speed \(speed)x"
+        sendButton.fillColor = speed == 1 ? Palette.panel : SKColor(red: 0.25, green: 0.53, blue: 0.79, alpha: 1)
+        sendLabel.fontColor = Palette.text
+    }
+
     func select(_ tool: Tool?) {
         for (buttonTool, node) in toolButtons {
             let isOn = buttonTool == tool
