@@ -61,18 +61,32 @@ struct GameView: View {
         GeometryReader { geo in
             ZStack {
                 Color(red: 0.07, green: 0.11, blue: 0.08)
-                    .ignoresSafeArea()
                 if let scene {
                     SpriteView(scene: scene)
                 }
             }
             .onAppear {
                 guard scene == nil else { return }
-                let newScene = GameScene(size: geo.size, level: session.level, difficulty: session.difficulty, endless: session.endless, challenge: session.challenge)
+                // The game fills the whole screen; it keeps its own controls clear of the
+                // Dynamic Island and home indicator using these insets
+                let windowInsets = UIApplication.shared.connectedScenes
+                    .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+                    .first?.safeAreaInsets ?? .zero
+                let insets = UIEdgeInsets(
+                    top: max(geo.safeAreaInsets.top, windowInsets.top),
+                    left: 0,
+                    bottom: max(geo.safeAreaInsets.bottom, windowInsets.bottom),
+                    right: 0
+                )
+                let newScene = GameScene(
+                    size: geo.size, level: session.level, difficulty: session.difficulty,
+                    endless: session.endless, challenge: session.challenge, safeInsets: insets
+                )
                 newScene.scaleMode = .aspectFit
                 newScene.onExit = onExit
                 scene = newScene
             }
         }
+        .ignoresSafeArea()
     }
 }

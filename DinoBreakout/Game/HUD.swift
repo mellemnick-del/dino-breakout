@@ -48,9 +48,12 @@ final class HUD: SKNode {
     private let pauseButton = SKShapeNode(rectOf: CGSize(width: 32, height: 32), cornerRadius: 8)
     private let sendLabel = makeLabel("Send Wave", size: 15, font: Fonts.heavy, color: Palette.bar)
     private let message = makeLabel("", size: 15, font: Fonts.heavy, color: Palette.warning)
+    /// Floats over the bottom of the board while a message shows.
+    private let messagePill = SKShapeNode()
     private var toolButtons: [(tool: Tool, node: SKShapeNode)] = []
+    private var messageMaxWidth: CGFloat = 300
 
-    init(size: CGSize, topHeight: CGFloat, bottomHeight: CGFloat) {
+    init(size: CGSize, topHeight: CGFloat, bottomHeight: CGFloat, topInset: CGFloat, bottomInset: CGFloat) {
         super.init()
         zPosition = 50
 
@@ -59,7 +62,7 @@ final class HUD: SKNode {
         top.position = CGPoint(x: size.width / 2, y: size.height - topHeight / 2)
         addChild(top)
 
-        let midY = size.height - topHeight / 2
+        let midY = size.height - topInset - (topHeight - topInset) / 2
         pauseButton.position = CGPoint(x: 28, y: midY)
         pauseButton.fillColor = Palette.panel
         pauseButton.strokeColor = SKColor(white: 1, alpha: 0.15)
@@ -92,18 +95,26 @@ final class HUD: SKNode {
         bottom.position = CGPoint(x: size.width / 2, y: bottomHeight / 2)
         addChild(bottom)
 
-        message.position = CGPoint(x: size.width / 2, y: bottomHeight - 16)
-        addChild(message)
+        messagePill.fillColor = Palette.bar.withAlphaComponent(0.88)
+        messagePill.strokeColor = Palette.warning.withAlphaComponent(0.4)
+        messagePill.lineWidth = 1
+        messagePill.position = CGPoint(x: size.width / 2, y: bottomHeight + 24)
+        messagePill.alpha = 0
+        messagePill.zPosition = 1
+        addChild(messagePill)
+        message.position = .zero
+        messagePill.addChild(message)
+        messageMaxWidth = size.width - 24
 
         let tools: [Tool] = BuildKind.allCases.map { .build($0) } + [.sell]
         let gap: CGFloat = 6
         let pad: CGFloat = 10
         let width = (size.width - pad * 2 - gap * CGFloat(tools.count - 1)) / CGFloat(tools.count)
-        let height = bottomHeight - 40
+        let height = bottomHeight - bottomInset - 12
         for (i, tool) in tools.enumerated() {
             let button = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 10)
             button.fillColor = Palette.panel
-            button.position = CGPoint(x: pad + width / 2 + CGFloat(i) * (width + gap), y: 8 + height / 2)
+            button.position = CGPoint(x: pad + width / 2 + CGFloat(i) * (width + gap), y: bottomInset + 6 + height / 2)
 
             let title: String
             let price: String
@@ -116,11 +127,11 @@ final class HUD: SKNode {
                 price = "70%"
             }
             let iconSprite = SKSpriteNode(texture: ParkArt.icon(for: tool, size: 34), size: CGSize(width: 34, height: 34))
-            iconSprite.position = CGPoint(x: 0, y: 14)
+            iconSprite.position = CGPoint(x: 0, y: 12)
             let titleLabel = makeLabel(title, size: 12)
-            titleLabel.position = CGPoint(x: 0, y: -10)
+            titleLabel.position = CGPoint(x: 0, y: -12)
             let priceLabel = makeLabel(price, size: 11, color: Palette.warning)
-            priceLabel.position = CGPoint(x: 0, y: -24)
+            priceLabel.position = CGPoint(x: 0, y: -25)
             button.addChild(iconSprite)
             button.addChild(titleLabel)
             button.addChild(priceLabel)
@@ -174,9 +185,20 @@ final class HUD: SKNode {
 
     func flash(_ text: String) {
         message.text = text
-        message.removeAllActions()
-        message.alpha = 1
-        message.run(.sequence([.wait(forDuration: 1.8), .fadeOut(withDuration: 0.4)]))
+        // Long messages shrink to fit the screen
+        message.setScale(1)
+        let textWidth = message.frame.width
+        if textWidth > messageMaxWidth - 28 {
+            message.setScale((messageMaxWidth - 28) / textWidth)
+        }
+        let pillWidth = min(messageMaxWidth, message.frame.width + 28)
+        messagePill.path = CGPath(
+            roundedRect: CGRect(x: -pillWidth / 2, y: -15, width: pillWidth, height: 30),
+            cornerWidth: 15, cornerHeight: 15, transform: nil
+        )
+        messagePill.removeAllActions()
+        messagePill.alpha = 1
+        messagePill.run(.sequence([.wait(forDuration: 1.8), .fadeOut(withDuration: 0.4)]))
     }
 
     /// Which control, if any, sits under a point in scene coordinates.

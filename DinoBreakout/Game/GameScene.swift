@@ -24,8 +24,12 @@ final class GameScene: SKScene {
 
     private let cols = Level.cols
     private let rows = Level.rows
-    private let topHeight: CGFloat = 60
-    private let bottomHeight: CGFloat = 108
+    /// The game runs edge to edge. These insets keep the bars' buttons clear of
+    /// the Dynamic Island and the home indicator.
+    private let topInset: CGFloat
+    private let bottomInset: CGFloat
+    private let topHeight: CGFloat
+    private let bottomHeight: CGFloat
 
     let level: Level
     let difficulty: Difficulty
@@ -100,7 +104,15 @@ final class GameScene: SKScene {
     private weak var selectedTower: Tower?
     private var selectedRing: SKShapeNode?
 
-    init(size: CGSize, level: Level, difficulty: Difficulty, endless: Bool = false, challenge: DailyChallenge? = nil) {
+    init(
+        size: CGSize, level: Level, difficulty: Difficulty, endless: Bool = false,
+        challenge: DailyChallenge? = nil, safeInsets: UIEdgeInsets = .zero
+    ) {
+        topInset = safeInsets.top
+        // The home indicator is hidden during play, so the build bar can sit partway into its space
+        bottomInset = safeInsets.bottom * 0.5
+        topHeight = topInset + 50
+        bottomHeight = bottomInset + 76
         self.level = level
         self.difficulty = difficulty
         self.challenge = challenge
@@ -166,7 +178,7 @@ final class GameScene: SKScene {
             _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: screenScale)
         }
 
-        hud = HUD(size: size, topHeight: topHeight, bottomHeight: bottomHeight)
+        hud = HUD(size: size, topHeight: topHeight, bottomHeight: bottomHeight, topInset: topInset, bottomInset: bottomInset)
         addChild(hud)
         cash = Progress.testMode ? 9999 : (challenge?.startingCash ?? difficulty.startingCash)
         lives = challenge?.lives ?? difficulty.lives
