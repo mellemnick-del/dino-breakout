@@ -608,7 +608,12 @@ final class GameScene: SKScene {
         hud.setSpeed(gameSpeed)
         setGate(open: true)
         SoundBank.shared.play(.alarm)
-        hud.flash("Wave \(wavesStarted): \(Waves.summary(wave))")
+        if wave.contains(where: { $0.kind.flies }) {
+            hud.flash("Wave \(wavesStarted): pterodactyls incoming! Flak hits them hardest")
+            SoundBank.shared.play(.screech)
+        } else {
+            hud.flash("Wave \(wavesStarted): \(Waves.summary(wave))")
+        }
     }
 
     private func cycleSpeed() {
@@ -650,7 +655,7 @@ final class GameScene: SKScene {
             SoundBank.shared.play(.screech)
             if !warnedAboutFlyers {
                 warnedAboutFlyers = true
-                hud.flash("Pterodactyls! They fly over fences. Build Flak to shoot them down")
+                hud.flash("Pterodactyls fly over fences. Turrets and tranqs do half damage; Flak does full")
             }
         }
 
@@ -873,7 +878,9 @@ final class GameScene: SKScene {
                     puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
                     SoundBank.shared.play(.hit)
                 }
-                hit(shot.target, for: shot.damage, slow: shot.slow)
+                // Only flak is built for the sky; everything else does half damage to flyers
+                let airPenalty: CGFloat = shot.target.kind.flies && shot.splash == 0 ? 0.5 : 1
+                hit(shot.target, for: shot.damage * airPenalty, slow: shot.slow)
                 shot.node.removeFromParent()
                 shot.done = true
             } else {

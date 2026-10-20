@@ -171,7 +171,7 @@ extension DinoKind {
                 legs: [],
                 arms: [],
                 head: .ptero(length: 26),
-                marks: .plain, cells: 1.0,
+                marks: .plain, cells: 1.35,
                 wingSpan: 46
             )
         }

@@ -42,7 +42,7 @@ enum DinoKind {
         case .triceratops: 200
         case .stegosaurus: 160
         case .rex: 1300
-        case .pterodactyl: 32
+        case .pterodactyl: 40
         }
     }
 
@@ -54,7 +54,7 @@ enum DinoKind {
         case .triceratops: 0.85
         case .stegosaurus: 0.75
         case .rex: 0.6
-        case .pterodactyl: 1.5
+        case .pterodactyl: 1.3
         }
     }
 

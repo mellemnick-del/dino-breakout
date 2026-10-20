@@ -54,7 +54,7 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 | Triceratops | Slow and very tough, costs 2 lives if it gets through |
 | T-Rex | Boss. Shakes the screen on arrival, costs 10 lives |
 | Stegosaurus | Armored: every hit loses 5 damage (always at least 1 gets through), so weak, fast shots barely scratch it. Upgrade your towers. Joins mixed waves from 13 and triceratops columns from 14 |
-| Pterodactyl | Flies straight over the maze from the gate to the chopper, weaving as it goes. Flak, turrets, and tranqs can hit it; flares can't. First flock on wave 11, then every third wave, a big flock on boss waves, and a few on most waves from 30 on |
+| Pterodactyl | Flies straight over the maze from the gate to the chopper, weaving as it goes. Flak hits it at full damage; turrets and tranqs only do half, and flares can't reach it. First flock on wave 11, then every third wave, a big flock on boss waves, and a few on most waves from 30 on |
 
 The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed.
 
