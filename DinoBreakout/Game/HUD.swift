@@ -52,6 +52,7 @@ final class HUD: SKNode {
     /// Floats over the bottom of the board while a message shows.
     private let messagePill = SKShapeNode()
     private var toolButtons: [(tool: Tool, node: SKShapeNode)] = []
+    private var priceLabels: [(cost: Int, label: SKLabelNode, button: SKShapeNode)] = []
     /// The air strike sits in the build bar's last slot, off the board.
     private var strikeButton = SKShapeNode()
     private let strikeStatus = makeLabel("Ready", size: 11, color: Palette.warning)
@@ -145,6 +146,9 @@ final class HUD: SKNode {
             button.addChild(iconSprite)
             button.addChild(titleLabel)
             button.addChild(priceLabel)
+            if case .build(let kind) = tool {
+                priceLabels.append((kind.cost, priceLabel, button))
+            }
 
             addChild(button)
             toolButtons.append((tool, button))
@@ -176,6 +180,12 @@ final class HUD: SKNode {
 
     func setCash(_ cash: Int) {
         cashLabel.text = "\(cash)"
+        // Anything you can't afford dims, with its price in red
+        for (cost, label, button) in priceLabels {
+            let affordable = cash >= cost
+            label.fontColor = affordable ? Palette.warning : Palette.danger
+            button.alpha = affordable ? 1 : 0.55
+        }
     }
 
     /// Pass nil for endless mode.

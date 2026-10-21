@@ -69,18 +69,26 @@ final class Grid {
         guard contains(cell), cell != spawn, cell != exit, !blocked.contains(cell) else { return false }
         var trial = blocked
         trial.insert(cell)
-        let trialField = buildField(blocked: trial)
-        for open in [spawn] + mustStayOpen where trialField[index(open)] == Grid.unreachable {
-            return false
-        }
-        let trialSwim = buildField(blocked: trial.subtracting(water))
-        for open in swimmers where trialSwim[index(open)] == Grid.unreachable {
-            return false
-        }
-        blocked = trial
-        field = trialField
-        swimField = trialSwim
-        return true
+        return apply(trial, keeping: mustStayOpen, swimmers: swimmers)
+    }
+
+    /// Whether building on a cell would leave every dino a way out, without building.
+    func canBlock(_ cell: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
+        guard contains(cell), cell != spawn, cell != exit, !blocked.contains(cell) else { return false }
+        var trial = blocked
+        trial.insert(cell)
+        return fields(for: trial, keeping: mustStayOpen, swimmers: swimmers) != nil
+    }
+
+    /// Moves a built square from one cell to another, as long as the dinos still
+    /// have a way out. Returns false and changes nothing if the move isn't allowed.
+    func move(from old: Cell, to new: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
+        guard blocked.contains(old), !terrain.contains(old),
+              contains(new), new != spawn, new != exit, !blocked.contains(new) else { return false }
+        var trial = blocked
+        trial.remove(old)
+        trial.insert(new)
+        return apply(trial, keeping: mustStayOpen, swimmers: swimmers)
     }
 
     func unblock(_ cell: Cell) {
@@ -102,6 +110,37 @@ final class Grid {
             Cell(col: cell.col + 1, row: cell.row),
             Cell(col: cell.col, row: cell.row + 1)
         ].filter { contains($0) }
+    }
+
+    /// Whether a move would leave every dino a way out, without moving anything.
+    func canMove(from old: Cell, to new: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
+        guard blocked.contains(old), !terrain.contains(old),
+              contains(new), new != spawn, new != exit, !blocked.contains(new) else { return false }
+        var trial = blocked
+        trial.remove(old)
+        trial.insert(new)
+        return fields(for: trial, keeping: mustStayOpen, swimmers: swimmers) != nil
+    }
+
+    private func apply(_ trial: Set<Cell>, keeping mustStayOpen: [Cell], swimmers: [Cell]) -> Bool {
+        guard let (walk, swim) = fields(for: trial, keeping: mustStayOpen, swimmers: swimmers) else { return false }
+        blocked = trial
+        field = walk
+        swimField = swim
+        return true
+    }
+
+    /// Distance maps for a trial layout, or nil if it seals anyone in.
+    private func fields(for trial: Set<Cell>, keeping mustStayOpen: [Cell], swimmers: [Cell]) -> ([Int], [Int])? {
+        let trialField = buildField(blocked: trial)
+        for open in [spawn] + mustStayOpen where trialField[index(open)] == Grid.unreachable {
+            return nil
+        }
+        let trialSwim = buildField(blocked: trial.subtracting(water))
+        for open in swimmers where trialSwim[index(open)] == Grid.unreachable {
+            return nil
+        }
+        return (trialField, trialSwim)
     }
 
     /// Breadth-first search outward from the helipad.

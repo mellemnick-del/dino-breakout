@@ -96,6 +96,10 @@ final class GameScene: SKScene {
 
     /// Live wires between neighboring fences, rebuilt when fences change.
     private let wireLayer = SKNode()
+    /// Faint marks on squares where building would trap the dinos.
+    private let hintLayer = SKNode()
+    private var hintTexture: SKTexture?
+    private var hintTimer: TimeInterval = 0
     /// How many dino steps each square has taken, and the dirt worn into it.
     private var wear: [Cell: Int] = [:]
     private var dirt: [Cell: SKSpriteNode] = [:]
@@ -152,6 +156,13 @@ final class GameScene: SKScene {
     private var towerPanel: SKNode?
     private weak var selectedTower: Tower?
     private var selectedRing: SKShapeNode?
+    /// A tower under the player's finger. Lifting opens its panel; moving drags it.
+    private weak var pressedTower: Tower?
+    private var pressPoint: CGPoint = .zero
+    private var pressOpensPanel = true
+    private var dragGhost: SKSpriteNode?
+    private var dragMarker: SKShapeNode?
+    private var dragCell: Cell?
 
     init(
         size: CGSize, level: Level, difficulty: Difficulty, endless: Bool = false,
@@ -209,6 +220,11 @@ final class GameScene: SKScene {
         gateDoors = []
         wireLayer.removeAllChildren()
         wireLayer.removeAllActions()
+        hintLayer.removeAllChildren()
+        pressedTower = nil
+        dragGhost = nil
+        dragMarker = nil
+        dragCell = nil
         pauseMenu = nil
         world.isPaused = false
         gameSpeed = 1
@@ -245,6 +261,7 @@ final class GameScene: SKScene {
         airstrikeReady = true
         airstrikeArmed = false
         updateAirstrikeButton()
+        refreshBuildHints()
         tutorial = nil
         if level.id == Level.all.first?.id, challenge == nil, !endless, !Tutorial.hasFinished {
             let guide = Tutorial(size: size, topY: size.height - topHeight) { [weak self] step in
@@ -277,6 +294,8 @@ final class GameScene: SKScene {
 
         wireLayer.zPosition = 2.5
         world.addChild(wireLayer)
+        hintLayer.zPosition = 2.4
+        world.addChild(hintLayer)
         wireLayer.run(.repeatForever(.sequence([
             .fadeAlpha(to: 0.8, duration: 0.5),
             .fadeAlpha(to: 1, duration: 0.5)
@@ -502,6 +521,8 @@ final class GameScene: SKScene {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
+        guard dragGhost == nil else { return }
+        pressedTower = nil
         if let overlay = gameOverOverlay {
             let hits = overlay.nodes(at: touch.location(in: overlay)).compactMap { $0.name }
             if hits.contains("endless") {
@@ -581,6 +602,10 @@ final class GameScene: SKScene {
             let previous = selectedTower?.cell
             closePanel()
             if let tapped = cell(at: touch.location(in: world)), tapped == previous {
+                // Tapping the open tower closes its panel, but it can still be dragged
+                pressedTower = towers[tapped]
+                pressPoint = touch.location(in: world)
+                pressOpensPanel = false
                 return
             }
         }
@@ -603,7 +628,42 @@ final class GameScene: SKScene {
             return
         }
         if let tapped = cell(at: touch.location(in: world)) {
+            if let tower = towers[tapped], tool != .sell {
+                // Decide on lift: a tap opens the panel, a drag moves the tower
+                pressedTower = tower
+                pressPoint = touch.location(in: world)
+                pressOpensPanel = true
+                return
+            }
             tap(tapped)
+        }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first, let tower = pressedTower, !isOver, pauseMenu == nil else { return }
+        let location = touch.location(in: world)
+        if dragGhost == nil {
+            guard distance(location, pressPoint) > cellSize * 0.35 else { return }
+            startDrag(tower)
+        }
+        updateDrag(tower, to: location)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let tower = pressedTower else { return }
+        pressedTower = nil
+        if dragGhost != nil {
+            finishDrag(tower, at: touches.first.flatMap { cell(at: $0.location(in: world)) })
+        } else if pressOpensPanel, !isOver, towers[tower.cell] === tower {
+            tap(tower.cell)
+        }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let tower = pressedTower else { return }
+        pressedTower = nil
+        if dragGhost != nil {
+            finishDrag(tower, at: nil)
         }
     }
 
@@ -618,42 +678,24 @@ final class GameScene: SKScene {
         }
 
         if tool == .build(.fence), challenge?.allowsFences == false {
-            hud.flash("No fences today. Build your maze from towers")
+            refuse(cell, "No fences", detail: "No fences today. Build your maze from towers")
             return
         }
         guard case .build(let kind)? = tool else {
             hud.flash("Pick something to build")
             return
         }
-        if grid.terrain.contains(cell) {
-            if level.water.contains(cell) {
-                hud.flash("Can't build in the river")
-            } else if level.lava.contains(cell) {
-                hud.flash("Can't build on lava")
-            } else if level.buildings.contains(cell) {
-                hud.flash("Can't build on a building")
-            } else {
-                hud.flash("Can't build on a boulder")
-            }
-            return
-        }
-        if cell == grid.spawn || cell == grid.exit {
-            hud.flash("Can't build there")
+        if let problem = siteProblem(at: cell) {
+            refuse(cell, problem.short, detail: problem.detail)
             return
         }
         guard cash >= kind.cost else {
-            hud.flash("Need $\(kind.cost)")
+            refuse(cell, "Need $\(kind.cost)", detail: "\(kind.title) costs $\(kind.cost). You have $\(cash)")
             return
         }
-        let walkers = dinos.filter { !$0.kind.flies && !$0.kind.swims }.flatMap { [$0.cell, $0.target] }
-        let swimmers = dinos.filter { $0.kind.swims }.flatMap { [$0.cell, $0.target] }
-        let occupied = walkers + swimmers
-        if occupied.contains(cell) {
-            hud.flash("Too close to a dino")
-            return
-        }
+        let (walkers, swimmers) = dinoCells()
         guard grid.block(cell, keeping: walkers, keepingSwimmers: swimmers) else {
-            hud.flash("Dinos need a way through!")
+            refuse(cell, "Blocks the path", detail: "That would trap the dinos. They need a way through!")
             return
         }
 
@@ -676,9 +718,219 @@ final class GameScene: SKScene {
         } else {
             tutorial?.handle(.towerBuilt)
             showRange(of: tower)
-            hud.flash("Tap any tower to upgrade or sell it")
+            hud.flash("Tap a tower to upgrade it, or drag it to move it")
         }
         rebuildDarkness()
+        refreshBuildHints()
+    }
+
+    /// Why a square can't be built on, money and the dinos' path aside.
+    private func siteProblem(at cell: Cell) -> (short: String, detail: String)? {
+        if towers[cell] != nil {
+            return ("Taken", "Something is already built there")
+        }
+        if grid.terrain.contains(cell) {
+            if level.water.contains(cell) {
+                return ("River", "Can't build in the river")
+            } else if level.lava.contains(cell) {
+                return ("Lava", "Can't build on lava")
+            } else if level.buildings.contains(cell) {
+                return ("Building", "Can't build on a building")
+            }
+            return ("Boulder", "Can't build on a boulder")
+        }
+        if cell == grid.spawn || cell == grid.exit {
+            return ("Keep clear", "The gate and the helipad have to stay open")
+        }
+        let (walkers, swimmers) = dinoCells()
+        if (walkers + swimmers).contains(cell) {
+            return ("Dino in the way", "Too close to a dino")
+        }
+        return nil
+    }
+
+    /// Squares dinos on the ground are standing on or heading to, which must stay reachable.
+    private func dinoCells() -> (walkers: [Cell], swimmers: [Cell]) {
+        let walkers = dinos.filter { !$0.kind.flies && !$0.kind.swims }.flatMap { [$0.cell, $0.target] }
+        let swimmers = dinos.filter { $0.kind.swims }.flatMap { [$0.cell, $0.target] }
+        return (walkers, swimmers)
+    }
+
+    /// Flashes a red X on the square and says why right there on the board.
+    private func refuse(_ cell: Cell, _ reason: String, detail: String) {
+        Haptics.failure()
+        hud.flash(detail)
+        let center = point(for: cell)
+
+        let mark = SKShapeNode(rectOf: CGSize(width: cellSize - 4, height: cellSize - 4), cornerRadius: 6)
+        mark.fillColor = Palette.danger.withAlphaComponent(0.35)
+        mark.strokeColor = Palette.danger
+        mark.lineWidth = 2
+        mark.position = center
+        mark.zPosition = 19
+        let reach = cellSize * 0.2
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: -reach, y: -reach))
+        path.addLine(to: CGPoint(x: reach, y: reach))
+        path.move(to: CGPoint(x: -reach, y: reach))
+        path.addLine(to: CGPoint(x: reach, y: -reach))
+        let cross = SKShapeNode(path: path)
+        cross.strokeColor = Palette.text
+        cross.lineWidth = 3
+        cross.lineCap = .round
+        mark.addChild(cross)
+        world.addChild(mark)
+        mark.run(.sequence([
+            .repeat(.sequence([.fadeAlpha(to: 0.35, duration: 0.1), .fadeAlpha(to: 1, duration: 0.1)]), count: 2),
+            .wait(forDuration: 0.4),
+            .fadeOut(withDuration: 0.3),
+            .removeFromParent()
+        ]))
+
+        let label = makeLabel(reason, size: 13, font: Fonts.heavy)
+        let tag = SKShapeNode(rectOf: CGSize(width: label.frame.width + 16, height: 24), cornerRadius: 12)
+        tag.fillColor = Palette.danger
+        tag.strokeColor = Palette.bar
+        tag.lineWidth = 1.5
+        tag.addChild(label)
+        tag.zPosition = 21
+        // Keep the tag on the board, above the square unless that's off the top
+        let half = tag.frame.width / 2 + 4
+        let boardTop = origin.y + cellSize * CGFloat(rows)
+        let y = center.y + cellSize * 0.8 > boardTop - 12 ? center.y - cellSize * 0.8 : center.y + cellSize * 0.8
+        tag.position = CGPoint(x: min(max(center.x, origin.x + half), origin.x + cellSize * CGFloat(cols) - half), y: y)
+        world.addChild(tag)
+        tag.setScale(0.6)
+        tag.run(.sequence([
+            .scale(to: 1, duration: 0.1),
+            .wait(forDuration: 1.1),
+            .group([.moveBy(x: 0, y: cellSize * 0.3, duration: 0.3), .fadeOut(withDuration: 0.3)]),
+            .removeFromParent()
+        ]))
+    }
+
+    /// Marks every open square where a build would seal the dinos in.
+    private func refreshBuildHints() {
+        hintLayer.removeAllChildren()
+        guard !isOver else { return }
+        if hintTexture == nil {
+            let size = CGSize(width: cellSize, height: cellSize)
+            hintTexture = SKTexture(image: UIGraphicsImageRenderer(size: size).image { context in
+                let gc = context.cgContext
+                let inset = CGRect(origin: .zero, size: size).insetBy(dx: cellSize * 0.32, dy: cellSize * 0.32)
+                gc.setStrokeColor(Palette.danger.withAlphaComponent(0.75).cgColor)
+                gc.setLineWidth(max(2, cellSize * 0.07))
+                gc.setLineCap(.round)
+                gc.move(to: CGPoint(x: inset.minX, y: inset.minY))
+                gc.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
+                gc.move(to: CGPoint(x: inset.minX, y: inset.maxY))
+                gc.addLine(to: CGPoint(x: inset.maxX, y: inset.minY))
+                gc.strokePath()
+            })
+        }
+        let (walkers, swimmers) = dinoCells()
+        let occupied = Set(walkers + swimmers)
+        for row in 0..<rows {
+            for col in 0..<cols {
+                let cell = Cell(col: col, row: row)
+                guard !grid.blocked.contains(cell), cell != grid.spawn, cell != grid.exit, !occupied.contains(cell),
+                      !grid.canBlock(cell, keeping: walkers, keepingSwimmers: swimmers) else { continue }
+                let mark = SKSpriteNode(texture: hintTexture, size: CGSize(width: cellSize, height: cellSize))
+                mark.position = point(for: cell)
+                mark.alpha = 0.7
+                hintLayer.addChild(mark)
+            }
+        }
+    }
+
+    // MARK: - Moving towers
+
+    private func startDrag(_ tower: Tower) {
+        closePanel()
+        guard let texture = view?.texture(from: tower) else { return }
+        let ghost = SKSpriteNode(texture: texture)
+        ghost.alpha = 0.85
+        ghost.setScale(1.15)
+        ghost.zPosition = 30
+        world.addChild(ghost)
+        dragGhost = ghost
+
+        let marker = SKShapeNode(rectOf: CGSize(width: cellSize - 2, height: cellSize - 2), cornerRadius: 6)
+        marker.lineWidth = 2.5
+        marker.zPosition = 29
+        world.addChild(marker)
+        dragMarker = marker
+        dragCell = nil
+        tower.alpha = 0.35
+        Haptics.tap()
+        if tower.kind != .fence {
+            // The range travels with the ghost, so you can see what it will cover
+            let ring = SKShapeNode(circleOfRadius: tower.range * cellSize / ghost.xScale)
+            ring.strokeColor = SKColor(white: 1, alpha: 0.5)
+            ring.fillColor = SKColor(white: 1, alpha: 0.06)
+            ring.zPosition = -1
+            ghost.addChild(ring)
+        }
+    }
+
+    private func updateDrag(_ tower: Tower, to location: CGPoint) {
+        dragGhost?.position = location
+        guard let marker = dragMarker else { return }
+        let target = cell(at: location)
+        marker.isHidden = target == nil
+        guard let target, target != dragCell else { return }
+        dragCell = target
+        marker.position = point(for: target)
+        let ok = target == tower.cell || moveProblem(tower, to: target) == nil
+        marker.strokeColor = ok ? SKColor(red: 0.45, green: 0.9, blue: 0.4, alpha: 1) : Palette.danger
+        marker.fillColor = (ok ? SKColor(red: 0.45, green: 0.9, blue: 0.4, alpha: 1) : Palette.danger).withAlphaComponent(0.25)
+        if target != tower.cell {
+            Haptics.tap()
+        }
+    }
+
+    private func moveProblem(_ tower: Tower, to cell: Cell) -> (short: String, detail: String)? {
+        if let problem = siteProblem(at: cell) {
+            return problem
+        }
+        let (walkers, swimmers) = dinoCells()
+        if !grid.canMove(from: tower.cell, to: cell, keeping: walkers, keepingSwimmers: swimmers) {
+            return ("Blocks the path", "That would trap the dinos. They need a way through!")
+        }
+        return nil
+    }
+
+    private func finishDrag(_ tower: Tower, at target: Cell?) {
+        dragGhost?.removeFromParent()
+        dragMarker?.removeFromParent()
+        dragGhost = nil
+        dragMarker = nil
+        dragCell = nil
+        tower.alpha = 1
+        guard !isOver, towers[tower.cell] === tower, let target, target != tower.cell else { return }
+        if let problem = moveProblem(tower, to: target) {
+            refuse(target, problem.short, detail: problem.detail)
+            return
+        }
+        let (walkers, swimmers) = dinoCells()
+        guard grid.move(from: tower.cell, to: target, keeping: walkers, keepingSwimmers: swimmers) else { return }
+        towers[tower.cell] = nil
+        towers[target] = tower
+        tower.cell = target
+        tower.position = point(for: target)
+        // A moved tower takes a second to set up before it fires again
+        tower.cooldown = max(tower.cooldown, 1)
+        tower.setScale(0.8)
+        tower.run(.scale(to: 1, duration: 0.12))
+        SoundBank.shared.play(.place)
+        Haptics.tap()
+        if tower.kind == .fence {
+            rebuildWires()
+        } else {
+            showRange(of: tower)
+        }
+        rebuildDarkness()
+        refreshBuildHints()
     }
 
     private func upgrade(_ tower: Tower) {
@@ -714,6 +966,7 @@ final class GameScene: SKScene {
             rebuildWires()
         }
         rebuildDarkness()
+        refreshBuildHints()
     }
 
     // MARK: - Waves
@@ -826,6 +1079,7 @@ final class GameScene: SKScene {
         cash += bonus + interest
         airstrikeReady = true
         updateAirstrikeButton()
+        refreshBuildHints()
         tutorial?.handle(.waveCleared)
         if !endless && wavesStarted == waveGoal {
             endGame(won: true)
@@ -842,6 +1096,13 @@ final class GameScene: SKScene {
         lastUpdate = currentTime
         guard !isOver, pauseMenu == nil, dt > 0 else { return }
         stats.playTime += dt
+        if waveActive {
+            hintTimer -= dt
+            if hintTimer <= 0 {
+                hintTimer = 0.4
+                refreshBuildHints()
+            }
+        }
 
         // Faster speeds run extra steps so nothing skips past a tower
         for _ in 0..<gameSpeed where !isOver {

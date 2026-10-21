@@ -135,7 +135,7 @@ final class Tower: SKNode {
     static let maxLevel = 5
 
     let kind: BuildKind
-    let cell: Cell
+    var cell: Cell
     private(set) var level = 1
     private(set) var invested: Int
     var cooldown: TimeInterval = 0

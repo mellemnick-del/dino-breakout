@@ -27,7 +27,8 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 
 - Dinos break out of the **paddock gate** 🚧 at the top and run for the **helipad** 🚁 at the bottom.
 - Pick something from the build bar, then tap an empty square to place it.
-- You can never fully block the path. If a placement would seal the dinos in, it's refused.
+- You can never fully block the path. Squares where a build would seal the dinos in are marked with a faint red X, and if you try one anyway it flashes red and says why right on the board (blocks the path, not enough cash, dino in the way, and so on). Build bar pieces you can't afford dim, with the price in red.
+- **Move towers:** press on any tower or fence and drag it to a new square. The target square glows green if it's allowed and red if not, and towers show their range while you drag. Moving is free, and a moved tower takes a second to set up before it fires.
 - Tap any tower you built to open its panel: its level (1 of 5, also shown as rank chevrons; levels 4 and 5 add gold trim, and level 5 a gold star), an **Upgrade** button with the price, **Sell** for 70% back, and its range.
 - **Abilities:** every tower's panel has a special move that recharges (25 seconds, 30 for napalm): Tranq **Sleep Gas** nearly freezes everything close by for 3 seconds, Turret **Overdrive** fires three times as fast for 5 seconds, Flare **Napalm** leaves a burning patch that ignores armor, and Flak **Barrage** blasts every flyer in range.
 - **Aim:** towers that shoot have an Aim chip in their panel: First (closest to the helipad), Strongest, Closest, or Flyers.
