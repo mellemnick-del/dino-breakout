@@ -48,7 +48,7 @@ appstoreconnect.apple.com, Apps, +, New App:
 - SKU: `dinobreakout`
 - User access: Full Access
 
-Then fill in everything from `docs/AppStoreListing.md`: subtitle, promotional text, description, keywords, support and privacy URLs, category (Games > Strategy), age rating questionnaire, and App Privacy (the AdMob answers in that doc).
+Then fill in everything from `docs/AppStoreListing.md`: subtitle, promotional text, description, keywords, support and privacy URLs, category (Games > Strategy), age rating questionnaire, and App Privacy (**Data Not Collected** for 1.0).
 
 ## 6. Game Center leaderboards
 
