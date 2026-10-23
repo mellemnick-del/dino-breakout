@@ -11,7 +11,8 @@ final class MenuBackdrop: SKScene {
         let scale = view.contentScaleFactor
         ParkArt.screenScale = scale
         backgroundColor = SKColor(red: 0.07, green: 0.11, blue: 0.08, alpha: 1)
-        cellSize = floor(size.width / 9)
+        // Phone sized squares on every screen, so iPad dinos stay small behind the menu
+        cellSize = min(floor(size.width / 9), 48)
 
         let cols = Int(ceil(size.width / cellSize))
         let rows = Int(ceil(size.height / cellSize))
