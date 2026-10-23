@@ -25,7 +25,9 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project DinoBreakout.xcodeproj -target DinoBreakout -configuration Debug \
-            -sdk iphonesimulator SYMROOT="$PWD/build" CODE_SIGNING_ALLOWED=NO build | tail -40
+            -sdk iphonesimulator -arch arm64 SYMROOT="$PWD/build" CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 \
+            || { grep -E -A4 "error:" build.log | head -80; exit 1; }
+          tail -5 build.log
 
       - name: Take screenshots
         run: |
