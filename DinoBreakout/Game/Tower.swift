@@ -212,6 +212,15 @@ final class Tower: SKNode {
         run(.sequence([.scale(to: 1.15, duration: 0.08), .scale(to: 1, duration: 0.12)]))
     }
 
+    /// Undoes the last upgrade, for Undo between waves.
+    func downgrade(refunding cost: Int) {
+        guard level > 1 else { return }
+        invested -= cost
+        level -= 1
+        base.texture = ParkArt.pad(kind, level: level, cell: cellSize)
+        buildGun()
+    }
+
     /// Counts down the ability recharge and any overdrive.
     func tickAbility(_ dt: TimeInterval) {
         abilityCooldown = max(0, abilityCooldown - dt)

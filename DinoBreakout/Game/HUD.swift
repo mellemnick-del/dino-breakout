@@ -38,6 +38,13 @@ enum HUDAction {
     case sendWave
     case pick(Tool)
     case airstrike
+    case undo
+}
+
+/// One kind of dino in the next wave preview.
+struct WavePreviewItem {
+    let texture: SKTexture
+    let count: Int
 }
 
 /// Top bar (lives, cash, wave, Send Wave) and the build bar along the bottom.
@@ -57,6 +64,14 @@ final class HUD: SKNode {
     private var strikeButton = SKShapeNode()
     private let strikeStatus = makeLabel("Ready", size: 11, color: Palette.warning)
     private var messageMaxWidth: CGFloat = 300
+    /// The strip under the top bar: what the next wave brings, plus Undo or dinos left.
+    static let stripHeight: CGFloat = 26
+    private let previewTitle = makeLabel("", size: 11, font: Fonts.heavy, color: Palette.muted)
+    private let previewIcons = SKNode()
+    private var previewRoom: CGFloat = 200
+    private let undoButton = SKShapeNode(rectOf: CGSize(width: 74, height: 20), cornerRadius: 7)
+    private let undoLabel = makeLabel("↶ Undo", size: 12, font: Fonts.heavy)
+    private let leftLabel = makeLabel("", size: 12, font: Fonts.heavy)
 
     init(size: CGSize, topHeight: CGFloat, bottomHeight: CGFloat, topInset: CGFloat, bottomInset: CGFloat) {
         super.init()
@@ -67,7 +82,27 @@ final class HUD: SKNode {
         top.position = CGPoint(x: size.width / 2, y: size.height - topHeight / 2)
         addChild(top)
 
-        let midY = size.height - topInset - (topHeight - topInset) / 2
+        let midY = size.height - topInset - (topHeight - topInset - HUD.stripHeight) / 2
+        let stripY = size.height - topHeight + HUD.stripHeight / 2
+        let strip = SKSpriteNode(color: Palette.panel, size: CGSize(width: size.width, height: HUD.stripHeight))
+        strip.position = CGPoint(x: size.width / 2, y: stripY)
+        addChild(strip)
+        previewTitle.horizontalAlignmentMode = .left
+        previewTitle.position = CGPoint(x: 12, y: stripY)
+        addChild(previewTitle)
+        previewIcons.position = CGPoint(x: 72, y: stripY)
+        addChild(previewIcons)
+        previewRoom = size.width - 72 - 12 - 74 - 10
+        undoButton.position = CGPoint(x: size.width - 12 - 37, y: stripY)
+        undoButton.fillColor = Palette.bar
+        undoButton.strokeColor = SKColor(white: 1, alpha: 0.25)
+        undoButton.lineWidth = 1
+        undoButton.addChild(undoLabel)
+        addChild(undoButton)
+        leftLabel.horizontalAlignmentMode = .right
+        leftLabel.position = CGPoint(x: size.width - 12, y: stripY)
+        leftLabel.isHidden = true
+        addChild(leftLabel)
         pauseButton.position = CGPoint(x: 28, y: midY)
         pauseButton.fillColor = Palette.panel
         pauseButton.strokeColor = SKColor(white: 1, alpha: 0.15)
@@ -236,6 +271,48 @@ final class HUD: SKNode {
         }
     }
 
+    /// Shows the dinos coming in a wave, each with how many.
+    func setPreview(title: String, items: [WavePreviewItem]) {
+        previewTitle.text = title
+        previewIcons.removeAllChildren()
+        previewIcons.setScale(1)
+        var x: CGFloat = 0
+        for item in items {
+            let tall: CGFloat = 18
+            let textureSize = item.texture.size()
+            let wide = min(30, tall * textureSize.width / max(1, textureSize.height))
+            let icon = SKSpriteNode(texture: item.texture, size: CGSize(width: wide, height: tall))
+            icon.position = CGPoint(x: x + wide / 2, y: 0)
+            previewIcons.addChild(icon)
+            x += wide + 2
+            let count = makeLabel("×\(item.count)", size: 11, font: Fonts.heavy, color: Palette.text)
+            count.horizontalAlignmentMode = .left
+            count.position = CGPoint(x: x, y: 0)
+            previewIcons.addChild(count)
+            x += count.frame.width + 8
+        }
+        if x > previewRoom {
+            previewIcons.setScale(previewRoom / x)
+        }
+    }
+
+    /// Between waves the strip shows Undo; during a wave, how many dinos are left.
+    func setRemaining(_ remaining: Int?, canUndo: Bool) {
+        if let remaining {
+            undoButton.isHidden = true
+            leftLabel.isHidden = false
+            let text = "\(remaining) left"
+            if leftLabel.text != text {
+                leftLabel.text = text
+            }
+        } else {
+            leftLabel.isHidden = true
+            undoButton.isHidden = false
+            undoButton.alpha = canUndo ? 1 : 0.4
+            undoButton.strokeColor = canUndo ? Palette.warning.withAlphaComponent(0.7) : SKColor(white: 1, alpha: 0.25)
+        }
+    }
+
     func select(_ tool: Tool?) {
         for (buttonTool, node) in toolButtons {
             let isOn = buttonTool == tool
@@ -284,6 +361,9 @@ final class HUD: SKNode {
         }
         if strikeButton.contains(point) {
             return .airstrike
+        }
+        if !undoButton.isHidden, undoButton.frame.insetBy(dx: -6, dy: -4).contains(point) {
+            return .undo
         }
         return nil
     }

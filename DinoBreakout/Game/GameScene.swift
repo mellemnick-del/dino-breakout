@@ -42,6 +42,19 @@ private final class Burn {
     }
 }
 
+/// Something Undo can take back between waves.
+private enum UndoStep {
+    case built(Tower)
+    case upgraded(Tower, cost: Int)
+
+    var tower: Tower {
+        switch self {
+        case .built(let tower), .upgraded(let tower, _):
+            tower
+        }
+    }
+}
+
 final class GameScene: SKScene {
     // MARK: Tuning
 
@@ -96,6 +109,11 @@ final class GameScene: SKScene {
 
     /// Live wires between neighboring fences, rebuilt when fences change.
     private let wireLayer = SKNode()
+    /// Marching dots along the route dinos will take from the gate.
+    private let pathLayer = SKNode()
+    private var pathDot: SKTexture?
+    /// Builds and upgrades since the last wave, newest last, for Undo.
+    private var undoSteps: [UndoStep] = []
     /// Faint marks on squares where building would trap the dinos.
     private let hintLayer = SKNode()
     private var hintTexture: SKTexture?
@@ -171,7 +189,7 @@ final class GameScene: SKScene {
         topInset = safeInsets.top
         // The home indicator is hidden during play, so the build bar can sit partway into its space
         bottomInset = safeInsets.bottom * 0.5
-        topHeight = topInset + 50
+        topHeight = topInset + 50 + HUD.stripHeight
         bottomHeight = bottomInset + 76
         self.level = level
         self.difficulty = difficulty
@@ -221,6 +239,8 @@ final class GameScene: SKScene {
         wireLayer.removeAllChildren()
         wireLayer.removeAllActions()
         hintLayer.removeAllChildren()
+        pathLayer.removeAllChildren()
+        undoSteps = []
         pressedTower = nil
         dragGhost = nil
         dragMarker = nil
@@ -262,6 +282,8 @@ final class GameScene: SKScene {
         airstrikeArmed = false
         updateAirstrikeButton()
         refreshBuildHints()
+        refreshPath()
+        updatePreview()
         tutorial = nil
         if level.id == Level.all.first?.id, challenge == nil, !endless, !Tutorial.hasFinished {
             let guide = Tutorial(size: size, topY: size.height - topHeight) { [weak self] step in
@@ -296,6 +318,8 @@ final class GameScene: SKScene {
         world.addChild(wireLayer)
         hintLayer.zPosition = 2.4
         world.addChild(hintLayer)
+        pathLayer.zPosition = 2.45
+        world.addChild(pathLayer)
         wireLayer.run(.repeatForever(.sequence([
             .fadeAlpha(to: 0.8, duration: 0.5),
             .fadeAlpha(to: 1, duration: 0.5)
@@ -624,6 +648,8 @@ final class GameScene: SKScene {
                 hud.select(tool)
             case .airstrike:
                 toggleAirstrike()
+            case .undo:
+                undo()
             }
             return
         }
@@ -708,6 +734,9 @@ final class GameScene: SKScene {
         tower.run(.scale(to: 1, duration: 0.12))
         world.addChild(tower)
         towers[cell] = tower
+        if !waveActive {
+            undoSteps.append(.built(tower))
+        }
         if kind == .fence {
             rebuildWires()
             let fenceCount = towers.values.filter({ $0.kind == .fence }).count
@@ -722,6 +751,7 @@ final class GameScene: SKScene {
         }
         rebuildDarkness()
         refreshBuildHints()
+        refreshPath()
     }
 
     /// Why a square can't be built on, money and the dinos' path aside.
@@ -843,6 +873,101 @@ final class GameScene: SKScene {
         }
     }
 
+    /// Dotted route from the gate to the helipad, so you can see your maze working.
+    private func refreshPath() {
+        pathLayer.removeAllChildren()
+        guard !isOver else { return }
+        if pathDot == nil {
+            let side = max(4, cellSize * 0.16)
+            pathDot = SKTexture(image: UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { context in
+                context.cgContext.setFillColor(Palette.warning.cgColor)
+                context.cgContext.fillEllipse(in: CGRect(x: 0, y: 0, width: side, height: side))
+            })
+        }
+        var route = [grid.spawn]
+        var here = grid.spawn
+        while let next = grid.nextStep(from: here), route.count <= cols * rows {
+            route.append(next)
+            here = next
+        }
+        let dotSize = pathDot?.size() ?? .zero
+        let period: TimeInterval = 1.2
+        var index = 0
+        for (a, b) in zip(route, route.dropFirst()) {
+            let from = point(for: a)
+            let to = point(for: b)
+            for step in 0..<3 where !(a == grid.spawn && step == 0) {
+                let f = CGFloat(step) / 3
+                let dot = SKSpriteNode(texture: pathDot, size: dotSize)
+                dot.position = CGPoint(x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f)
+                dot.alpha = 0.25
+                // Each dot lights a moment after the one before, so the line marches toward the helipad
+                let delay = (Double(index) * 0.05).truncatingRemainder(dividingBy: period)
+                dot.run(.sequence([
+                    .wait(forDuration: delay),
+                    .repeatForever(.sequence([
+                        .fadeAlpha(to: 0.9, duration: 0.15),
+                        .fadeAlpha(to: 0.25, duration: 0.45),
+                        .wait(forDuration: period - 0.6)
+                    ]))
+                ]))
+                pathLayer.addChild(dot)
+                index += 1
+            }
+        }
+        pathLayer.alpha = waveActive ? 0.5 : 1
+    }
+
+    /// Shows the next wave's dinos in the strip under the top bar.
+    private func updatePreview() {
+        let next = wavesStarted + 1
+        guard endless || next <= waveGoal else {
+            hud.setPreview(title: "LAST WAVE", items: [])
+            return
+        }
+        var counts: [(kind: DinoKind, count: Int)] = []
+        for group in Waves.groups(forWave: next, flyerHeavy: flyerHeavy) {
+            if let i = counts.firstIndex(where: { $0.kind == group.kind }) {
+                counts[i].count += group.count
+            } else {
+                counts.append((group.kind, group.count))
+            }
+        }
+        let items = counts.compactMap { entry -> WavePreviewItem? in
+            guard let frame = DinoArt.bake(entry.kind, cellSize: cellSize, screenScale: screenScale).frames.first else { return nil }
+            return WavePreviewItem(texture: frame, count: entry.count)
+        }
+        hud.setPreview(title: waveActive ? "NEXT · \(next)" : "WAVE \(next)", items: items)
+    }
+
+    private var flyerHeavy: Bool {
+        level.flyerHeavy || challenge?.flyerHeavy == true
+    }
+
+    /// Takes back the last build or upgrade since the wave ended, for a full refund.
+    private func undo() {
+        guard !waveActive, let step = undoSteps.popLast() else {
+            hud.flash("Nothing to undo. Undo works on builds and upgrades since the last wave")
+            return
+        }
+        closePanel()
+        let tower = step.tower
+        guard towers[tower.cell] === tower else { return }
+        switch step {
+        case .built:
+            cash += tower.invested
+            floatText("+$\(tower.invested)", at: tower.position)
+            undoSteps.removeAll { $0.tower === tower }
+            removeTower(tower)
+        case .upgraded(_, let cost):
+            tower.downgrade(refunding: cost)
+            cash += cost
+            floatText("+$\(cost)", at: tower.position)
+        }
+        SoundBank.shared.play(.sell)
+        Haptics.tap()
+    }
+
     // MARK: - Moving towers
 
     private func startDrag(_ tower: Tower) {
@@ -931,6 +1056,7 @@ final class GameScene: SKScene {
         }
         rebuildDarkness()
         refreshBuildHints()
+        refreshPath()
     }
 
     private func upgrade(_ tower: Tower) {
@@ -944,6 +1070,9 @@ final class GameScene: SKScene {
         }
         cash -= cost
         tower.upgrade()
+        if !waveActive {
+            undoSteps.append(.upgraded(tower, cost: cost))
+        }
         SoundBank.shared.play(.upgrade)
         Haptics.punch()
         tutorial?.handle(.upgraded)
@@ -959,6 +1088,11 @@ final class GameScene: SKScene {
         Haptics.tap()
         cash += tower.sellValue
         floatText("+$\(tower.sellValue)", at: tower.position)
+        undoSteps.removeAll { $0.tower === tower }
+        removeTower(tower)
+    }
+
+    private func removeTower(_ tower: Tower) {
         towers[tower.cell] = nil
         grid.unblock(tower.cell)
         tower.removeFromParent()
@@ -967,13 +1101,13 @@ final class GameScene: SKScene {
         }
         rebuildDarkness()
         refreshBuildHints()
+        refreshPath()
     }
 
     // MARK: - Waves
 
     private func sendWave() {
         guard !waveActive, !isOver, endless || wavesStarted < waveGoal else { return }
-        let flyerHeavy = level.flyerHeavy || challenge?.flyerHeavy == true
         let wave = Waves.groups(forWave: wavesStarted + 1, flyerHeavy: flyerHeavy)
         livesAtWaveStart = lives
         waveHadRex = false
@@ -981,6 +1115,9 @@ final class GameScene: SKScene {
         spawnQueue = Waves.schedule(wave)
         waveClock = 0
         waveActive = true
+        undoSteps = []
+        pathLayer.alpha = 0.5
+        updatePreview()
         hud.setWave(wavesStarted, of: endless ? nil : waveGoal)
         hud.setSpeed(gameSpeed)
         setGate(open: true)
@@ -1080,6 +1217,8 @@ final class GameScene: SKScene {
         airstrikeReady = true
         updateAirstrikeButton()
         refreshBuildHints()
+        pathLayer.alpha = 1
+        updatePreview()
         tutorial?.handle(.waveCleared)
         if !endless && wavesStarted == waveGoal {
             endGame(won: true)
@@ -1096,6 +1235,7 @@ final class GameScene: SKScene {
         lastUpdate = currentTime
         guard !isOver, pauseMenu == nil, dt > 0 else { return }
         stats.playTime += dt
+        hud.setRemaining(waveActive ? spawnQueue.count + dinos.count : nil, canUndo: !undoSteps.isEmpty)
         if waveActive {
             hintTimer -= dt
             if hintTimer <= 0 {
@@ -1776,6 +1916,7 @@ final class GameScene: SKScene {
         Progress.recordEndless(wave: wavesStarted, level: level, difficulty: difficulty)
         hud.setWave(wavesStarted, of: nil)
         hud.setSendEnabled(true)
+        updatePreview()
         hud.flash("Endless mode. The dinos keep coming. How long can you hold?")
     }
 
