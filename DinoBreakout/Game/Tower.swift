@@ -230,6 +230,8 @@ enum Targeting: CaseIterable {
 /// Anything you build. Every tower is also a wall, so it shapes the maze.
 final class Tower: SKNode {
     static let maxLevel = 5
+    /// Better Optics research, set when a game starts.
+    static var rangeScale: CGFloat = 1
 
     let kind: BuildKind
     var cell: Cell
@@ -261,11 +263,12 @@ final class Tower: SKNode {
     private var gun: SKSpriteNode?
     private var flashes: [SKSpriteNode] = []
 
-    init(kind: BuildKind, cell: Cell, cellSize: CGFloat) {
+    /// `paid` is what the player actually spent, when research made it cheaper.
+    init(kind: BuildKind, cell: Cell, cellSize: CGFloat, paid: Int? = nil) {
         self.kind = kind
         self.cell = cell
         self.cellSize = cellSize
-        invested = kind.cost
+        invested = paid ?? kind.cost
         if kind == .fence {
             base = SKSpriteNode(texture: ParkArt.fencePost(cell: cellSize), size: CGSize(width: cellSize * 0.6, height: cellSize * 0.6))
         } else {
@@ -288,7 +291,7 @@ final class Tower: SKNode {
 
     /// Reach in cells, growing with each upgrade.
     var range: CGFloat {
-        kind.range + 0.3 * CGFloat(level - 1) + (branch?.rangeBonus ?? 0)
+        (kind.range + 0.3 * CGFloat(level - 1) + (branch?.rangeBonus ?? 0)) * Tower.rangeScale
     }
 
     /// The branch name once picked, otherwise the tower's own name.

@@ -21,16 +21,17 @@ The power's out, the paddocks are open, and every dinosaur in the park is runnin
 BUILD THE MAZE
 There are no set paths. Every fence and tower you place is a wall, and the dinos always take the shortest way left. Build a long, twisting maze and line it with firepower.
 
-FIVE TOWERS, FIVE LEVELS EACH
+SIX TOWERS, TEN UPGRADE PATHS
 - Tranq rifles slow dinos down
 - Turrets do the heavy lifting
 - Flares burn whole crowds
 - Flak cannons shoot down pterodactyls
+- Shock pylons chain lightning through the herd
 - Electric fences shape the maze
-Every tower upgrades to level 5 and has a special move: Sleep Gas, Overdrive, Napalm, and Barrage.
+Every tower upgrades to level 5, picks one of two specialties along the way, and has a special move.
 
-EIGHT KINDS OF DINOSAUR
-Compies swarm. Raptors sprint. Triceratops and armored stegosaurs soak up damage. Dilophosaurs spit venom that jams your towers. Spinosaurs swim straight across rivers. Pterodactyls fly right over your fences. And every tenth wave, the ground starts shaking.
+TEN KINDS OF DINOSAUR
+Compies swarm. Raptors sprint. Triceratops and armored stegosaurs soak up damage. Dilophosaurs spit venom that jams your towers. Ankylosaurs club your fences flat. Pachys headbutt your towers. Spinosaurs swim straight across rivers. Pterodactyls fly right over your fences. And every tenth wave, the ground starts shaking.
 
 SEVEN PARKS
 Open paddocks, boulder ridges, a river with two bridges, the visitor center, an open aviary, a park in total darkness, and the slopes of a waking volcano.
@@ -41,7 +42,8 @@ PLAY YOUR WAY
 - A new daily challenge every day
 - Call in an air strike when things get desperate
 - Speed up to 3x
-- 14 achievements
+- 14 achievements and a Research Lab for permanent upgrades
+- Saves between waves, so you can pick up where you left off
 - No forced ads: watch one only if you want a revive or bonus cash
 - No account needed, plays offline
 

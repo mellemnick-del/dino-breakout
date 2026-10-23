@@ -118,6 +118,10 @@ final class GameScene: SKScene {
     /// Marching dots along the route dinos will take from the gate.
     private let pathLayer = SKNode()
     private var pathDot: SKTexture?
+    /// Research Lab bonuses for this run (none in daily challenges).
+    private var research = Research.Bonuses()
+    /// Amber earned since this scene started, for the game over screen.
+    private var amberThisRun: Double = 0
     /// A saved run to pick up when the scene first starts.
     private var pendingResume: SavedGame?
     /// Whether this run owns the save slot, so ending it clears the save.
@@ -233,6 +237,9 @@ final class GameScene: SKScene {
             SavedGame.clear()
             hasSaved = false
         }
+        research = Research.bonuses(dailyChallenge: challenge != nil)
+        Tower.rangeScale = research.rangeScale
+        amberThisRun = 0
         removeAllChildren()
         world.removeAllChildren()
         world.removeAllActions()
@@ -284,8 +291,9 @@ final class GameScene: SKScene {
 
         hud = HUD(size: size, topHeight: topHeight, bottomHeight: bottomHeight, topInset: topInset, bottomInset: bottomInset)
         addChild(hud)
-        cash = Progress.testMode ? 9999 : (challenge?.startingCash ?? difficulty.startingCash)
-        lives = challenge?.lives ?? difficulty.lives
+        hud.setPrice(.fence, to: price(of: .fence))
+        cash = Progress.testMode ? 9999 : (challenge?.startingCash ?? difficulty.startingCash) + research.startingCash
+        lives = (challenge?.lives ?? difficulty.lives) + research.lives
         activeToasts = 0
         endless = startedEndless
         hud.setWave(0, of: endless ? nil : waveGoal)
@@ -757,8 +765,9 @@ final class GameScene: SKScene {
             refuse(cell, problem.short, detail: problem.detail)
             return
         }
-        guard cash >= kind.cost else {
-            refuse(cell, "Need $\(kind.cost)", detail: "\(kind.title) costs $\(kind.cost). You have $\(cash)")
+        let cost = price(of: kind)
+        guard cash >= cost else {
+            refuse(cell, "Need $\(cost)", detail: "\(kind.title) costs $\(cost). You have $\(cash)")
             return
         }
         let (walkers, swimmers) = dinoCells()
@@ -767,10 +776,10 @@ final class GameScene: SKScene {
             return
         }
 
-        cash -= kind.cost
+        cash -= cost
         SoundBank.shared.play(.place)
         Haptics.tap()
-        let tower = Tower(kind: kind, cell: cell, cellSize: cellSize)
+        let tower = Tower(kind: kind, cell: cell, cellSize: cellSize, paid: cost)
         tower.position = point(for: cell)
         tower.setScale(0.6)
         tower.run(.scale(to: 1, duration: 0.12))
@@ -795,6 +804,11 @@ final class GameScene: SKScene {
         refreshBuildHints()
         refreshPath()
         saveProgress()
+    }
+
+    /// What a piece costs after research.
+    private func price(of kind: BuildKind) -> Int {
+        kind == .fence ? max(2, kind.cost - research.fenceDiscount) : kind.cost
     }
 
     /// Why a square can't be built on, money and the dinos' path aside.
@@ -1324,11 +1338,15 @@ final class GameScene: SKScene {
         }
         let bonus = 5 + min(wavesStarted, Waves.total)
         // 5% interest on cash you saved, up to $50, rewards banking for a big upgrade
-        let interest = min(50, cash / 20)
+        let interest = min(50 + research.interestCapBonus, cash / 20)
         // Perfect wave: nothing reached the helipad
         let perfect = lives == livesAtWaveStart
         let perfectBonus = perfect ? 5 + wavesStarted / 2 : 0
         cash += bonus + interest + perfectBonus
+        if !Progress.testMode {
+            Research.earn(Research.amberPerWave(difficulty))
+            amberThisRun += Research.amberPerWave(difficulty)
+        }
         if endless || wavesStarted < waveGoal {
             saveProgress()
         }
@@ -1676,7 +1694,7 @@ final class GameScene: SKScene {
             break
         }
         let scale = Waves.rewardScale(forWave: max(0, wavesStarted - 1)) * difficulty.bounty * (challenge?.bountyScale ?? 1)
-        let reward = max(1, Int((CGFloat(dino.kind.reward) * scale).rounded()))
+        let reward = max(1, Int((CGFloat(dino.kind.reward) * scale * research.bountyScale).rounded()))
         cash += reward
         floatText("+$\(reward)", at: dino.position)
         SoundBank.shared.play(.dinoDown, volume: dino.kind == .compy ? 0.5 : 1)
@@ -1693,6 +1711,10 @@ final class GameScene: SKScene {
         if hasSaved {
             SavedGame.clear()
             hasSaved = false
+        }
+        if won && !Progress.testMode {
+            Research.earn(Research.winBonus)
+            amberThisRun += Research.winBonus
         }
         if won, let chopper {
             let lift = SKAction.group([
@@ -1755,7 +1777,8 @@ final class GameScene: SKScene {
         detail.position = CGPoint(x: 0, y: -8)
         overlay.addChild(detail)
 
-        let summary = makeLabel(stats.summary, size: 13, color: Palette.muted)
+        let amberNote = amberThisRun >= 1 ? "  ·  +\(Int(amberThisRun)) amber" : ""
+        let summary = makeLabel(stats.summary + amberNote, size: 13, color: Palette.muted)
         summary.position = CGPoint(x: 0, y: -34)
         summary.setScale(min(1, (size.width - 24) / max(1, summary.frame.width)))
         overlay.addChild(summary)
@@ -1967,7 +1990,7 @@ final class GameScene: SKScene {
 
         let duration: TimeInterval = 1.1
         heli.run(.sequence([.moveTo(x: right, duration: duration), .removeFromParent()]))
-        let damage = 45 * Waves.healthScale(forWave: max(0, wavesStarted - 1)) * difficulty.health
+        let damage = 45 * Waves.healthScale(forWave: max(0, wavesStarted - 1)) * difficulty.health * research.strikeScale
         let steps = 10
         for i in 0..<steps {
             let x = left + (right - left) * CGFloat(i) / CGFloat(steps - 1)

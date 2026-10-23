@@ -59,7 +59,7 @@ final class HUD: SKNode {
     /// Floats over the bottom of the board while a message shows.
     private let messagePill = SKShapeNode()
     private var toolButtons: [(tool: Tool, node: SKShapeNode)] = []
-    private var priceLabels: [(cost: Int, label: SKLabelNode, button: SKShapeNode)] = []
+    private var priceLabels: [(kind: BuildKind, cost: Int, label: SKLabelNode, button: SKShapeNode)] = []
     /// The air strike sits in the build bar's last slot, off the board.
     private var strikeButton = SKShapeNode()
     private let strikeStatus = makeLabel("Ready", size: 11, color: Palette.warning)
@@ -203,7 +203,7 @@ final class HUD: SKNode {
             button.addChild(titleLabel)
             button.addChild(priceLabel)
             if case .build(let kind) = tool {
-                priceLabels.append((kind.cost, priceLabel, button))
+                priceLabels.append((kind, kind.cost, priceLabel, button))
             }
 
             addChild(button)
@@ -230,6 +230,13 @@ final class HUD: SKNode {
         fatalError("init(coder:) is not used")
     }
 
+    /// Research can make a piece cheaper than its list price.
+    func setPrice(_ kind: BuildKind, to cost: Int) {
+        guard let i = priceLabels.firstIndex(where: { $0.kind == kind }) else { return }
+        priceLabels[i].cost = cost
+        priceLabels[i].label.text = "$\(cost)"
+    }
+
     func setLives(_ lives: Int) {
         livesLabel.text = "\(lives)"
     }
@@ -237,7 +244,7 @@ final class HUD: SKNode {
     func setCash(_ cash: Int) {
         cashLabel.text = "\(cash)"
         // Anything you can't afford dims, with its price in red
-        for (cost, label, button) in priceLabels {
+        for (_, cost, label, button) in priceLabels {
             let affordable = cash >= cost
             label.fontColor = affordable ? Palette.warning : Palette.danger
             button.alpha = affordable ? 1 : 0.55

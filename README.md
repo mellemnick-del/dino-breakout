@@ -19,6 +19,8 @@ The game opens on a title screen with dinos roaming the park behind it.
 - **Test mode** (builds run from Xcode only): tap the big DINO title 7 times. Every park and endless mode unlock, you start with $9,999, and nothing counts toward stars, records, or achievements. Tap 7 more times to turn it off.
 - **Endless mode:** beat all 50 waves on a park (any difficulty) and its card gets an Endless button. Waves never stop: crowds grow until wave 60, then health keeps climbing, with a T-Rex boss wave every 10 (up to 6 T-Rexes) and pterodactyl flocks. You can also tap **Keep Going** on the victory screen to carry your towers straight into endless. Your endless record is saved per park and difficulty.
 - **Stars:** one at wave 10, two at wave 25, three for beating all 50, tracked per park and difficulty. Each card shows its stars and best wave, and the header shows your total.
+- **Research Lab** (flask button): every wave you clear earns amber (0.75 on Easy, 1 on Medium, 1.5 on Hard, plus 15 for a full win or a daily challenge). Spend it on permanent upgrades, three levels each: cheaper fences, more starting cash, extra lives, longer tower range, bigger bounties, a higher interest cap, and stronger air strikes. Research never applies to daily challenges.
+- **Game Center:** achievements are also reported to Game Center (IDs in `docs/ReleaseChecklist.md`).
 - **Settings** (gear): separate Music and Sound effects volume. All audio is synthesized in code (`Sound.swift`), and it follows the phone's silent switch.
 
 New parks are added in `Level.swift`: a gate square, a helipad square, and any boulders, river squares, and bridges.
@@ -95,7 +97,7 @@ To get new changes later: **Integrate > Pull**.
 
 ## Tech
 
-- Swift, SpriteKit, and a thin SwiftUI wrapper. iOS 17 and up, iPhone, portrait.
+- Swift, SpriteKit, and a thin SwiftUI wrapper. iOS 17 and up, iPhone and iPad, portrait.
 - Zero third party dependencies.
 - The `DinoBreakout` folder is a synced folder in Xcode, so any new Swift file dropped in it is part of the build automatically.
 

@@ -86,6 +86,7 @@ enum Achievements {
     static func earn(_ achievement: Achievement) -> Bool {
         guard !Progress.testMode, !isEarned(achievement) else { return false }
         UserDefaults.standard.set(true, forKey: key(achievement))
+        GameCenter.report([achievement])
         return true
     }
 

@@ -29,6 +29,7 @@ struct MenuView: View {
     @AppStorage(Progress.testModeKey) private var testMode = false
     @State private var showSettings = false
     @State private var showTrophies = false
+    @State private var showResearch = false
     @State private var titleTaps = 0
 
     private var difficulty: Difficulty {
@@ -58,6 +59,8 @@ struct MenuView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
         }
@@ -66,6 +69,9 @@ struct MenuView: View {
         }
         .sheet(isPresented: $showTrophies) {
             TrophyRoom()
+        }
+        .sheet(isPresented: $showResearch) {
+            ResearchLab()
         }
     }
 
@@ -101,6 +107,17 @@ struct MenuView: View {
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(MenuColor.line))
                 }
                 .accessibilityLabel("Achievements")
+                Button {
+                    showResearch = true
+                } label: {
+                    Image(systemName: "flask.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(MenuColor.hazard)
+                        .frame(width: 42, height: 42)
+                        .background(MenuColor.panel.opacity(0.9), in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(MenuColor.line))
+                }
+                .accessibilityLabel("Research Lab")
                 Button {
                     showSettings = true
                 } label: {
@@ -515,6 +532,11 @@ struct TrophyRoom: View {
                             GameCenter.showLeaderboards()
                         } label: {
                             Label("Leaderboards", systemImage: "list.number")
+                        }
+                        Button {
+                            GameCenter.showAchievements()
+                        } label: {
+                            Label("Game Center achievements", systemImage: "rosette")
                         }
                     }
                 }

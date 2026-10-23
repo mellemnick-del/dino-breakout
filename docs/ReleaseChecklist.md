@@ -9,7 +9,7 @@ Work top to bottom. Items marked **(done)** are already handled in the project.
 - [x] Export compliance: no non-exempt encryption (`ITSAppUsesNonExemptEncryption = NO`), so App Store Connect won't ask
 - [x] Game Center capability on (`DinoBreakout.entitlements`)
 - [x] Test mode only exists in builds run from Xcode. TestFlight and App Store builds never have it (Apple rejects hidden features)
-- [x] Portrait only, iPhone
+- [x] Portrait only, iPhone and iPad
 
 ## 2. Signing (Xcode, once)
 
@@ -78,6 +78,25 @@ In the app's page in App Store Connect: Services (or Features), Game Center, the
 | Endless: Mount Ember | `endless.mount-ember` |
 | Daily challenge | `daily.waves` |
 
+Also create **Achievements** (same Game Center page, Achievements, +). For each one: the reference name and ID below, **Achievable more than once: No**, points of your choice (all 14 must add up to 1,000 or less, so 50 each works), and a title, description, and 512 x 512 image. The game reports them automatically once they exist.
+
+| Achievement | ID |
+| --- | --- |
+| First Bite | `achievement.firstBite` |
+| Holding the Line | `achievement.holdingTheLine` |
+| Evacuation Complete | `achievement.evacuationComplete` |
+| Hard Target | `achievement.hardTarget` |
+| Park Ranger | `achievement.parkRanger` |
+| Rex Wrangler | `achievement.rexWrangler` |
+| Flak Ace | `achievement.flakAce` |
+| Untouchable | `achievement.untouchable` |
+| Fully Loaded | `achievement.fullyLoaded` |
+| Maze Master | `achievement.mazeMaster` |
+| Never Off | `achievement.neverOff` |
+| Fast Forward | `achievement.fastForward` |
+| Daily Driver | `achievement.dailyDriver` |
+| Plate Breaker | `achievement.plateBreaker` |
+
 Then add Game Center to the version you're submitting (in the version page, Game Center section, add the leaderboards).
 
 ## 7. Upload a build
@@ -99,6 +118,8 @@ For every later upload, raise the **Build** number first (target, General tab), 
 ## 9. Screenshots
 
 At least the **6.9 inch** size (1320 x 2868). In Xcode, run on an **iPhone Pro Max** simulator and press **Cmd + S** to save a screenshot to the desktop. The suggested six shots and captions are in `docs/AppStoreListing.md`. Running from Xcode means test mode is available to set up scenes fast; it won't exist in the submitted build.
+
+The game now supports **iPad** too, so Apple also requires **13 inch iPad** screenshots (2064 x 2752). Run on an **iPad Pro 13-inch** simulator and press Cmd + S.
 
 ## 10. Submit
 
