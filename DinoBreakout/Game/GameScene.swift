@@ -2395,7 +2395,7 @@ final class GameScene: SKScene {
         guard let cost = tower.upgradeCost else { return }
         closePanel()
         selectedTower = tower
-        let width = min(size.width - 16, 310)
+        let width: CGFloat = min(size.width - 16, 310)
         let height: CGFloat = 190
         let panel = SKNode()
         panel.zPosition = 90
@@ -2414,7 +2414,7 @@ final class GameScene: SKScene {
         panel.addChild(heading)
 
         let options = TowerBranch.options(for: tower.kind)
-        let cardWidth = (width - 36) / 2
+        let cardWidth: CGFloat = (width - 36) / 2
         let cardHeight: CGFloat = 140
         for (i, option) in options.enumerated() {
             let name = "pick-\(option.rawValue)"
@@ -2423,7 +2423,9 @@ final class GameScene: SKScene {
             card.fillColor = Palette.panel
             card.strokeColor = option.color
             card.lineWidth = 2
-            card.position = CGPoint(x: -width / 2 + 12 + cardWidth / 2 + CGFloat(i) * (cardWidth + 12), y: -12)
+            let firstX: CGFloat = -width / 2 + 12 + cardWidth / 2
+            let step: CGFloat = cardWidth + 12
+            card.position = CGPoint(x: firstX + CGFloat(i) * step, y: -12)
 
             let title = makeLabel(option.title, size: 17, font: Fonts.heavy, color: option.color)
             title.name = name
