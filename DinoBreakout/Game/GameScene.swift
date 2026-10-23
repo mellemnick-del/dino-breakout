@@ -112,6 +112,10 @@ final class GameScene: SKScene {
     /// Marching dots along the route dinos will take from the gate.
     private let pathLayer = SKNode()
     private var pathDot: SKTexture?
+    /// A saved run to pick up when the scene first starts.
+    private var pendingResume: SavedGame?
+    /// Whether this run owns the save slot, so ending it clears the save.
+    private var hasSaved = false
     /// Builds and upgrades since the last wave, newest last, for Undo.
     private var undoSteps: [UndoStep] = []
     /// Faint marks on squares where building would trap the dinos.
@@ -184,8 +188,9 @@ final class GameScene: SKScene {
 
     init(
         size: CGSize, level: Level, difficulty: Difficulty, endless: Bool = false,
-        challenge: DailyChallenge? = nil, safeInsets: UIEdgeInsets = .zero
+        challenge: DailyChallenge? = nil, safeInsets: UIEdgeInsets = .zero, resume: SavedGame? = nil
     ) {
+        pendingResume = resume
         topInset = safeInsets.top
         // The home indicator is hidden during play, so the build bar can sit partway into its space
         bottomInset = safeInsets.bottom * 0.5
@@ -214,6 +219,11 @@ final class GameScene: SKScene {
     // MARK: - Setup
 
     private func startNewGame() {
+        // Restarting throws away this run's save; a different park's save is left alone
+        if hasSaved {
+            SavedGame.clear()
+            hasSaved = false
+        }
         removeAllChildren()
         world.removeAllChildren()
         world.removeAllActions()
@@ -281,11 +291,16 @@ final class GameScene: SKScene {
         airstrikeReady = true
         airstrikeArmed = false
         updateAirstrikeButton()
+        let resumed = pendingResume
+        if let resumed {
+            pendingResume = nil
+            restore(resumed)
+        }
         refreshBuildHints()
         refreshPath()
         updatePreview()
         tutorial = nil
-        if level.id == Level.all.first?.id, challenge == nil, !endless, !Tutorial.hasFinished {
+        if resumed == nil, level.id == Level.all.first?.id, challenge == nil, !endless, !Tutorial.hasFinished {
             let guide = Tutorial(size: size, topY: size.height - topHeight) { [weak self] step in
                 guard let self, let hud = self.hud else { return nil }
                 switch step {
@@ -298,7 +313,9 @@ final class GameScene: SKScene {
             addChild(guide.node)
             tutorial = guide
         }
-        if let challenge {
+        if resumed != nil {
+            hud.flash("Welcome back. Wave \(wavesStarted) cleared, wave \(wavesStarted + 1) is next")
+        } else if let challenge {
             hud.flash("Daily challenge: \(challenge.twist.title). \(challenge.twist.detail)")
         } else if endless {
             hud.flash("Endless \(level.name). How long can you hold the line?")
@@ -752,6 +769,7 @@ final class GameScene: SKScene {
         rebuildDarkness()
         refreshBuildHints()
         refreshPath()
+        saveProgress()
     }
 
     /// Why a square can't be built on, money and the dinos' path aside.
@@ -944,6 +962,66 @@ final class GameScene: SKScene {
         level.flyerHeavy || challenge?.flyerHeavy == true
     }
 
+    // MARK: - Save and resume
+
+    /// Saves the run between waves. Mid-wave quits resume from the last save.
+    private func saveProgress() {
+        guard challenge == nil, !isOver, !waveActive, wavesStarted > 0 else { return }
+        let saved = SavedGame(
+            levelId: level.id,
+            difficulty: difficulty.rawValue,
+            endless: endless,
+            startedEndless: startedEndless,
+            wave: wavesStarted,
+            cash: cash,
+            lives: lives,
+            towers: towers.values.map {
+                SavedGame.SavedTower(
+                    kind: "\($0.kind)", col: $0.cell.col, row: $0.cell.row,
+                    level: $0.level, targeting: "\($0.targeting)"
+                )
+            },
+            kills: stats.kills,
+            damage: stats.damage.mapValues { Double($0) },
+            playTime: stats.playTime,
+            revived: revivedThisGame,
+            lastAdBonusWave: lastAdBonusWave
+        )
+        saved.store()
+        hasSaved = true
+    }
+
+    private func restore(_ save: SavedGame) {
+        hasSaved = true
+        endless = save.endless
+        wavesStarted = save.wave
+        cash = save.cash
+        lives = save.lives
+        revivedThisGame = save.revived
+        lastAdBonusWave = save.lastAdBonusWave
+        stats.kills = save.kills
+        stats.damage = save.damage.mapValues { CGFloat($0) }
+        stats.playTime = save.playTime
+        warnedAboutFlyers = save.wave >= 11
+        warnedAboutSpit = save.wave >= 19
+        for saved in save.towers {
+            guard let kind = BuildKind.allCases.first(where: { "\($0)" == saved.kind }) else { continue }
+            let cell = Cell(col: saved.col, row: saved.row)
+            guard towers[cell] == nil, grid.block(cell, keeping: []) else { continue }
+            let tower = Tower(kind: kind, cell: cell, cellSize: cellSize)
+            tower.position = point(for: cell)
+            while tower.level < saved.level, tower.upgradeCost != nil {
+                tower.upgrade()
+            }
+            tower.targeting = Targeting.allCases.first { "\($0)" == saved.targeting } ?? .first
+            world.addChild(tower)
+            towers[cell] = tower
+        }
+        rebuildWires()
+        rebuildDarkness()
+        hud.setWave(wavesStarted, of: endless ? nil : waveGoal)
+    }
+
     /// Takes back the last build or upgrade since the wave ended, for a full refund.
     private func undo() {
         guard !waveActive, let step = undoSteps.popLast() else {
@@ -963,6 +1041,7 @@ final class GameScene: SKScene {
             tower.downgrade(refunding: cost)
             cash += cost
             floatText("+$\(cost)", at: tower.position)
+            saveProgress()
         }
         SoundBank.shared.play(.sell)
         Haptics.tap()
@@ -1057,6 +1136,7 @@ final class GameScene: SKScene {
         rebuildDarkness()
         refreshBuildHints()
         refreshPath()
+        saveProgress()
     }
 
     private func upgrade(_ tower: Tower) {
@@ -1073,6 +1153,7 @@ final class GameScene: SKScene {
         if !waveActive {
             undoSteps.append(.upgraded(tower, cost: cost))
         }
+        saveProgress()
         SoundBank.shared.play(.upgrade)
         Haptics.punch()
         tutorial?.handle(.upgraded)
@@ -1102,6 +1183,7 @@ final class GameScene: SKScene {
         rebuildDarkness()
         refreshBuildHints()
         refreshPath()
+        saveProgress()
     }
 
     // MARK: - Waves
@@ -1214,6 +1296,9 @@ final class GameScene: SKScene {
         // 5% interest on cash you saved, up to $50, rewards banking for a big upgrade
         let interest = min(50, cash / 20)
         cash += bonus + interest
+        if endless || wavesStarted < waveGoal {
+            saveProgress()
+        }
         airstrikeReady = true
         updateAirstrikeButton()
         refreshBuildHints()
@@ -1493,6 +1578,10 @@ final class GameScene: SKScene {
     private func endGame(won: Bool) {
         isOver = true
         waveActive = false
+        if hasSaved {
+            SavedGame.clear()
+            hasSaved = false
+        }
         if won, let chopper {
             let lift = SKAction.group([
                 .scale(to: 1.7, duration: 1.4),
@@ -1917,6 +2006,7 @@ final class GameScene: SKScene {
         hud.setWave(wavesStarted, of: nil)
         hud.setSendEnabled(true)
         updatePreview()
+        saveProgress()
         hud.flash("Endless mode. The dinos keep coming. How long can you hold?")
     }
 

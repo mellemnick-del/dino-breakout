@@ -17,6 +17,8 @@ struct GameSession: Identifiable {
     let difficulty: Difficulty
     var endless = false
     var challenge: DailyChallenge?
+    /// A saved run to pick back up.
+    var resume: SavedGame?
 }
 
 /// Shows the main menu, or a game once a park is picked.
@@ -36,6 +38,13 @@ struct RootView: View {
                     session = GameSession(level: level, difficulty: difficulty, endless: endless)
                 } onDaily: { challenge in
                     session = GameSession(level: challenge.level, difficulty: challenge.difficulty, challenge: challenge)
+                } onContinue: { saved in
+                    if let level = saved.level {
+                        session = GameSession(
+                            level: level, difficulty: saved.difficultyLevel,
+                            endless: saved.startedEndless, resume: saved
+                        )
+                    }
                 }
                 .transition(.opacity)
             }
@@ -82,7 +91,8 @@ struct GameView: View {
                 )
                 let newScene = GameScene(
                     size: geo.size, level: session.level, difficulty: session.difficulty,
-                    endless: session.endless, challenge: session.challenge, safeInsets: insets
+                    endless: session.endless, challenge: session.challenge, safeInsets: insets,
+                    resume: session.resume
                 )
                 newScene.scaleMode = .aspectFit
                 newScene.onExit = onExit

@@ -23,6 +23,7 @@ struct MenuView: View {
     /// Park, difficulty, and whether it's an endless run.
     let onPlay: (Level, Difficulty, Bool) -> Void
     let onDaily: (DailyChallenge) -> Void
+    let onContinue: (SavedGame) -> Void
 
     @AppStorage("difficulty") private var difficultyRaw = Difficulty.medium.rawValue
     @AppStorage(Progress.testModeKey) private var testMode = false
@@ -48,6 +49,9 @@ struct MenuView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     header
+                    if let saved = SavedGame.load() {
+                        continueCard(saved)
+                    }
                     dailyCard
                     difficultyPicker
                     parks
@@ -134,6 +138,40 @@ struct MenuView: View {
                 .padding(.top, 2)
         }
         .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
+    }
+
+    /// Picks up the run saved between waves.
+    private func continueCard(_ saved: SavedGame) -> some View {
+        Button {
+            onContinue(saved)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(MenuColor.hazardInk)
+                    .frame(width: 62, height: 62)
+                    .background(MenuColor.hazard, in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("CONTINUE")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .tracking(1.2)
+                        .foregroundStyle(MenuColor.hazard)
+                    Text(saved.level?.name ?? "Your park")
+                        .font(.system(size: 18, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MenuColor.text)
+                    Text("\(saved.difficultyLevel.title)\(saved.endless ? " · Endless" : "") · wave \(saved.wave + 1) next · \(saved.lives) lives · $\(saved.cash)")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(MenuColor.muted)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(MenuColor.panel.opacity(0.92), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(MenuColor.hazard, lineWidth: 2))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Picks up your saved game")
     }
 
     private var dailyCard: some View {
