@@ -1,7 +1,7 @@
 import SpriteKit
 
 enum BuildKind: CaseIterable {
-    case fence, tranq, turret, flare, flak
+    case fence, tranq, turret, flare, flak, shock
 
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum BuildKind: CaseIterable {
         case .turret: "Turret"
         case .flare: "Flare"
         case .flak: "Flak"
+        case .shock: "Shock"
         }
     }
 
@@ -20,6 +21,7 @@ enum BuildKind: CaseIterable {
         case .turret: 35
         case .flare: 50
         case .flak: 45
+        case .shock: 60
         }
     }
 
@@ -31,6 +33,7 @@ enum BuildKind: CaseIterable {
         case .turret: 2.2
         case .flare: 1.4
         case .flak: 3.2
+        case .shock: 1.8
         }
     }
 
@@ -41,6 +44,7 @@ enum BuildKind: CaseIterable {
         case .turret: 0.35
         case .flare: 1.4
         case .flak: 0.6
+        case .shock: 1.1
         }
     }
 
@@ -51,6 +55,7 @@ enum BuildKind: CaseIterable {
         case .turret: 8
         case .flare: 16
         case .flak: 22
+        case .shock: 14
         }
     }
 
@@ -62,6 +67,7 @@ enum BuildKind: CaseIterable {
         case .turret: "Overdrive"
         case .flare: "Napalm"
         case .flak: "Barrage"
+        case .shock: "Overload"
         }
     }
 
@@ -72,6 +78,7 @@ enum BuildKind: CaseIterable {
         case .turret: "Fires three times as fast for 5 seconds"
         case .flare: "Leaves a burning patch for 4 seconds"
         case .flak: "Blasts every flyer in range at once"
+        case .shock: "Zaps every dino in range for 4x damage"
         }
     }
 
@@ -80,9 +87,9 @@ enum BuildKind: CaseIterable {
         self == .flare ? 30 : 25
     }
 
-    /// Flares burn the ground, so they can't reach flyers.
+    /// Flares burn the ground and lightning needs a ground path, so neither reaches flyers.
     var hitsAir: Bool {
-        self != .flare && self != .fence
+        self != .flare && self != .fence && self != .shock
     }
 
     /// Flak is built for the sky and can't hit anything walking.
@@ -107,6 +114,96 @@ enum BuildKind: CaseIterable {
         case .turret: SKColor(red: 0.45, green: 0.47, blue: 0.5, alpha: 1)
         case .flare: SKColor(red: 0.9, green: 0.45, blue: 0.15, alpha: 1)
         case .flak: SKColor(red: 0.36, green: 0.42, blue: 0.21, alpha: 1)
+        case .shock: SKColor(red: 0.35, green: 0.75, blue: 0.95, alpha: 1)
+        }
+    }
+}
+
+/// The two ways each tower can specialize when it goes from level 3 to 4.
+enum TowerBranch: String, CaseIterable {
+    case sedative, sniper, minigun, cannon, inferno, phosphor, hailstorm, skyhammer, storm, arc
+
+    static func options(for kind: BuildKind) -> [TowerBranch] {
+        switch kind {
+        case .fence: []
+        case .tranq: [.sedative, .sniper]
+        case .turret: [.minigun, .cannon]
+        case .flare: [.inferno, .phosphor]
+        case .flak: [.hailstorm, .skyhammer]
+        case .shock: [.storm, .arc]
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .sedative: "Sedative"
+        case .sniper: "Sniper"
+        case .minigun: "Minigun"
+        case .cannon: "Cannon"
+        case .inferno: "Inferno"
+        case .phosphor: "Phosphor"
+        case .hailstorm: "Hailstorm"
+        case .skyhammer: "Skyhammer"
+        case .storm: "Storm"
+        case .arc: "Arc"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .sedative: "Darts slow dinos to a crawl, and for longer"
+        case .sniper: "Much longer range and harder hits"
+        case .minigun: "Fires far faster"
+        case .cannon: "Slow, heavy shells that blast nearby dinos too"
+        case .inferno: "A much wider ring of fire"
+        case .phosphor: "Hotter fire that ignores armor"
+        case .hailstorm: "Faster fire and wider bursts"
+        case .skyhammer: "Huge shells that can hit ground dinos too"
+        case .storm: "Lightning jumps to three more dinos"
+        case .arc: "Harder zaps that stun for a moment"
+        }
+    }
+
+    /// One letter for the badge on the tower.
+    var letter: String {
+        String(title.prefix(1))
+    }
+
+    var color: SKColor {
+        switch self {
+        case .sedative, .inferno, .hailstorm, .storm, .minigun:
+            SKColor(red: 0.35, green: 0.75, blue: 0.95, alpha: 1)
+        case .sniper, .cannon, .phosphor, .skyhammer, .arc:
+            SKColor(red: 0.95, green: 0.55, blue: 0.25, alpha: 1)
+        }
+    }
+
+    var damageScale: CGFloat {
+        switch self {
+        case .sniper: 1.6
+        case .cannon: 1.9
+        case .phosphor: 1.3
+        case .skyhammer: 1.7
+        case .arc: 1.6
+        default: 1
+        }
+    }
+
+    /// Shots per second, compared with the base tower.
+    var rateScale: CGFloat {
+        switch self {
+        case .minigun: 1.7
+        case .cannon: 0.6
+        case .hailstorm: 1.5
+        default: 1
+        }
+    }
+
+    var rangeBonus: CGFloat {
+        switch self {
+        case .sniper: 1.2
+        case .inferno: 0.5
+        default: 0
         }
     }
 }
@@ -137,6 +234,10 @@ final class Tower: SKNode {
     let kind: BuildKind
     var cell: Cell
     private(set) var level = 1
+    /// Picked on the way to level 4.
+    private(set) var branch: TowerBranch?
+    private var badge: SKNode?
+    private var dizzy: SKNode?
     private(set) var invested: Int
     var cooldown: TimeInterval = 0
     /// Dinos this tower finished off, and the damage it's dealt, for its panel.
@@ -187,13 +288,64 @@ final class Tower: SKNode {
 
     /// Reach in cells, growing with each upgrade.
     var range: CGFloat {
-        kind.range + 0.3 * CGFloat(level - 1)
+        kind.range + 0.3 * CGFloat(level - 1) + (branch?.rangeBonus ?? 0)
+    }
+
+    /// The branch name once picked, otherwise the tower's own name.
+    var title: String {
+        branch?.title ?? kind.title
+    }
+
+    /// Level 3 towers pick a branch before they reach level 4.
+    var needsBranch: Bool {
+        level == 3 && branch == nil && !TowerBranch.options(for: kind).isEmpty
+    }
+
+    var fireInterval: TimeInterval {
+        kind.fireInterval / TimeInterval(branch?.rateScale ?? 1)
+    }
+
+    var slow: (factor: CGFloat, duration: TimeInterval)? {
+        if branch == .sedative {
+            return (factor: 0.3, duration: 2.4)
+        }
+        return kind.slow
+    }
+
+    /// Cannon shells blast ground dinos nearby; flak bursts catch other flyers.
+    var splash: CGFloat {
+        if branch == .cannon {
+            return 0.75
+        }
+        return kind.splash + (branch == .hailstorm ? 0.5 : 0)
+    }
+
+    var splashHitsGround: Bool {
+        branch == .cannon
+    }
+
+    var hitsAir: Bool {
+        kind.hitsAir
+    }
+
+    var hitsGround: Bool {
+        kind.hitsGround || branch == .skyhammer
+    }
+
+    var ignoresArmor: Bool {
+        branch == .phosphor
+    }
+
+    /// How many more dinos a shock pylon's lightning jumps to after the first.
+    var chain: Int {
+        guard kind == .shock else { return 0 }
+        return 1 + level / 2 + (branch == .storm ? 3 : 0)
     }
 
     /// Each level hits harder, but levels 4 and 5 add less than the first upgrades.
     var damage: CGFloat {
         let multipliers: [CGFloat] = [1, 1.6, 2.5, 3.6, 5]
-        return kind.damage * multipliers[min(max(level, 1), multipliers.count) - 1]
+        return kind.damage * multipliers[min(max(level, 1), multipliers.count) - 1] * (branch?.damageScale ?? 1)
     }
 
     /// Nil for fences and maxed towers.
@@ -206,10 +358,14 @@ final class Tower: SKNode {
         invested * 7 / 10
     }
 
-    func upgrade() {
+    func upgrade(branch picked: TowerBranch? = nil) {
         guard let cost = upgradeCost else { return }
+        if level == 3, let picked {
+            branch = picked
+        }
         invested += cost
         level += 1
+        updateBadge()
         base.texture = ParkArt.pad(kind, level: level, cell: cellSize)
         buildGun()
         run(.sequence([.scale(to: 1.15, duration: 0.08), .scale(to: 1, duration: 0.12)]))
@@ -220,8 +376,46 @@ final class Tower: SKNode {
         guard level > 1 else { return }
         invested -= cost
         level -= 1
+        if level < 4 {
+            branch = nil
+        }
+        updateBadge()
         base.texture = ParkArt.pad(kind, level: level, cell: cellSize)
         buildGun()
+    }
+
+    /// A colored letter in the corner showing which branch this tower took.
+    private func updateBadge() {
+        badge?.removeFromParent()
+        badge = nil
+        guard let branch else { return }
+        let dot = SKShapeNode(circleOfRadius: cellSize * 0.15)
+        dot.fillColor = branch.color
+        dot.strokeColor = ParkArt.outline
+        dot.lineWidth = 1.5
+        dot.position = CGPoint(x: -cellSize * 0.3, y: cellSize * 0.3)
+        dot.zPosition = 3
+        let letter = makeLabel(branch.letter, size: cellSize * 0.2, font: Fonts.heavy, color: ParkArt.outline)
+        dot.addChild(letter)
+        addChild(dot)
+        badge = dot
+    }
+
+    /// Headbutted by a pachy: can't fire for a moment, with stars circling.
+    func stun(for duration: TimeInterval) {
+        disabledLeft = max(disabledLeft, duration)
+        guard dizzy == nil else { return }
+        let ring = SKNode()
+        ring.zPosition = 4
+        for i in 0..<3 {
+            let a = CGFloat(i) * .pi * 2 / 3
+            let star = makeLabel("★", size: cellSize * 0.24, font: Fonts.heavy, color: Palette.warning)
+            star.position = CGPoint(x: cos(a) * cellSize * 0.25, y: sin(a) * cellSize * 0.25)
+            ring.addChild(star)
+        }
+        ring.run(.repeatForever(.rotate(byAngle: .pi * 2, duration: 0.8)))
+        addChild(ring)
+        dizzy = ring
     }
 
     /// Counts down the ability recharge and any overdrive.
@@ -232,6 +426,8 @@ final class Tower: SKNode {
             if disabledLeft <= 0 {
                 goo?.run(.sequence([.fadeOut(withDuration: 0.2), .removeFromParent()]))
                 goo = nil
+                dizzy?.removeFromParent()
+                dizzy = nil
             }
         }
         guard overdriveLeft > 0 else { return }

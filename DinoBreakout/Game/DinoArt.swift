@@ -37,10 +37,11 @@ struct DinoStyle {
         case trike(length: CGFloat)
         case ptero(length: CGFloat)
         case dilo(length: CGFloat)
+        case dome(length: CGFloat)
     }
 
     enum Marks {
-        case spots, stripes, ridge, blotches, plain, plates, sail
+        case spots, stripes, ridge, blotches, plain, plates, sail, armor
     }
 
     let skin: UIColor
@@ -76,6 +77,7 @@ struct DinoStyle {
         case .trike(let length): length
         case .ptero(let length): length
         case .dilo(let length): length
+        case .dome(let length): length
         }
     }
 
@@ -201,6 +203,34 @@ extension DinoKind {
                 head: .ptero(length: 26),
                 marks: .plain, cells: 1.35,
                 wingSpan: 46
+            )
+        case .ankylosaurus:
+            DinoStyle(
+                skin: UIColor(hex: 0x8A7A52), light: UIColor(hex: 0xB9A878), dark: UIColor(hex: 0x4E4228), eye: UIColor(hex: 0x1A1208),
+                spine: [(0, 18), (-8, 40), (-22, 56), (-38, 60), (-52, 54), (-64, 36), (-74, 18), (-84, 10), (-92, 6)],
+                hip: 56, sway: 0.8, wag: 5, wave: 0.05, stride: 4, rate: 0.8,
+                legs: [
+                    DinoLeg(x: -16, side: 1, spread: 26, rx: 9, ry: 8, off: 0),
+                    DinoLeg(x: -16, side: -1, spread: 26, rx: 9, ry: 8, off: .pi),
+                    DinoLeg(x: -50, side: 1, spread: 28, rx: 10, ry: 9, off: .pi),
+                    DinoLeg(x: -50, side: -1, spread: 28, rx: 10, ry: 9, off: 0)
+                ],
+                arms: [],
+                head: .theropod(length: 18, widths: [20, 22, 20, 15, 9], teeth: 0, brow: true),
+                marks: .armor, cells: 1.6
+            )
+        case .pachycephalosaurus:
+            DinoStyle(
+                skin: UIColor(hex: 0x7D6A9A), light: UIColor(hex: 0xAE9CCB), dark: UIColor(hex: 0x43345C), eye: UIColor(hex: 0xF2B92A),
+                spine: [(0, 11), (-6, 17), (-16, 22), (-26, 22), (-34, 17), (-44, 11), (-56, 7), (-68, 4), (-78, 1.5)],
+                hip: 30, sway: 1.5, wag: 4, wave: 0.05, stride: 6.5, rate: 1.6,
+                legs: [
+                    DinoLeg(x: -26, side: 1, spread: 13, rx: 10, ry: 6, off: 0),
+                    DinoLeg(x: -26, side: -1, spread: 13, rx: 10, ry: 6, off: .pi)
+                ],
+                arms: [DinoArm(x: -6, spread: 10, rx: 4, ry: 2.2)],
+                head: .dome(length: 22),
+                marks: .stripes, cells: 1.1
             )
         }
     }
@@ -421,6 +451,8 @@ enum DinoArt {
             drawPteroHead(style, length: length, lineWidth: lw, in: ctx)
         case .dilo(let length):
             drawDiloHead(style, length: length, lineWidth: lw, in: ctx)
+        case .dome(let length):
+            drawDomeHead(style, length: length, lineWidth: lw, in: ctx)
         }
         ctx.restoreGState()
     }
@@ -518,6 +550,31 @@ enum DinoArt {
                     ctx.closePath()
                     paint(ctx, claw)
                 }
+            }
+        case .armor:
+            // Rows of bony studs, spikes along the flanks, and the club on the tail
+            for i in 1..<min(6, pts.count) {
+                let f = frameAt(pts, i)
+                for k: CGFloat in [-1, 0, 1] {
+                    let r = max(1.5, f.p.w * 0.07)
+                    ellipse(ctx, f.p.x + f.nx * f.p.w * 0.28 * k, f.p.y + f.ny * f.p.w * 0.28 * k, r, r)
+                    paint(ctx, style.dark)
+                }
+                for side: CGFloat in [1, -1] {
+                    let base = CGPoint(x: f.p.x + f.nx * f.p.w * 0.47 * side, y: f.p.y + f.ny * f.p.w * 0.47 * side)
+                    let tip = CGPoint(x: base.x + f.nx * 5 * side, y: base.y + f.ny * 5 * side)
+                    ctx.move(to: CGPoint(x: base.x + f.tx * 2.5, y: base.y + f.ty * 2.5))
+                    ctx.addLine(to: tip)
+                    ctx.addLine(to: CGPoint(x: base.x - f.tx * 2.5, y: base.y - f.ty * 2.5))
+                    ctx.closePath()
+                    paint(ctx, claw)
+                }
+            }
+            if let last = pts.last {
+                ellipse(ctx, last.x + 4, last.y, 8, 7)
+                paint(ctx, style.dark)
+                ellipse(ctx, last.x + 3, last.y - 1.5, 3.5, 2.5)
+                fill(ctx, style.light, alpha: 0.6)
             }
         case .blotches:
             for i in 1...5 where i < pts.count {
@@ -719,6 +776,28 @@ enum DinoArt {
             ellipse(ctx, L * 0.3, side * 4.3, 2, 1.8)
             paint(ctx, eyeWhite)
             ellipse(ctx, L * 0.31, side * 4.3, 1.1, 1.1)
+            fill(ctx, style.eye)
+        }
+    }
+
+    /// A small beaked head under a thick bony dome ringed with knobs.
+    private static func drawDomeHead(_ style: DinoStyle, length L: CGFloat, lineWidth lw: CGFloat, in ctx: CGContext) {
+        drawHeadShape(style, headProfile(L, [13, 15, 12, 8, 5]), in: ctx)
+        ellipse(ctx, L * 0.3, 0, L * 0.34, 9)
+        paint(ctx, style.light)
+        ellipse(ctx, L * 0.26, -1.8, L * 0.17, 4.2)
+        fill(ctx, .white, alpha: 0.35)
+        for i in 0..<9 {
+            let a = CGFloat.pi * 0.65 + CGFloat(i) / 8 * CGFloat.pi * 0.7
+            ellipse(ctx, L * 0.3 + cos(a) * L * 0.36, sin(a) * 9.6, 1.4, 1.4)
+            paint(ctx, style.dark)
+            ellipse(ctx, L * 0.3 + cos(a) * L * 0.36, -sin(a) * 9.6, 1.4, 1.4)
+            paint(ctx, style.dark)
+        }
+        for side: CGFloat in [1, -1] {
+            ellipse(ctx, L * 0.66, side * 4.6, 1.8, 1.6)
+            paint(ctx, eyeWhite)
+            ellipse(ctx, L * 0.67, side * 4.6, 1, 1)
             fill(ctx, style.eye)
         }
     }

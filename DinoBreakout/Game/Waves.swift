@@ -109,6 +109,10 @@ enum Waves {
             if number >= 14 {
                 column.append(SpawnGroup(kind: .stegosaurus, count: n(5), every: every(1.6), startAt: 2))
             }
+            // Ankylosaurs from wave 22, clubbing fences down as they go
+            if number >= 22 {
+                column.append(SpawnGroup(kind: .ankylosaurus, count: max(1, n(3) - 1), every: every(2.5), startAt: 5))
+            }
             return column
         default:
             var mixed = [
@@ -122,6 +126,10 @@ enum Waves {
             // Dilophosaurs from wave 19, spitting at towers along the way
             if number >= 19 {
                 mixed.append(SpawnGroup(kind: .dilophosaurus, count: n(4), every: every(1.2), startAt: 2))
+            }
+            // Pachys from wave 24, charging and headbutting towers
+            if number >= 24 {
+                mixed.append(SpawnGroup(kind: .pachycephalosaurus, count: n(4), every: every(0.9), startAt: 4))
             }
             return mixed
         }

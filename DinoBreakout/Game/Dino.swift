@@ -2,6 +2,12 @@ import SpriteKit
 
 enum DinoKind {
     case compy, raptor, dilophosaurus, triceratops, stegosaurus, spinosaurus, rex, pterodactyl
+    case ankylosaurus, pachycephalosaurus
+
+    static let all: [DinoKind] = [
+        .compy, .raptor, .dilophosaurus, .triceratops, .stegosaurus, .spinosaurus, .rex, .pterodactyl,
+        .ankylosaurus, .pachycephalosaurus
+    ]
 
     var name: String {
         switch self {
@@ -13,7 +19,19 @@ enum DinoKind {
         case .spinosaurus: "Spinosaurus"
         case .rex: "T-Rex"
         case .pterodactyl: "Pterodactyl"
+        case .ankylosaurus: "Ankylosaurus"
+        case .pachycephalosaurus: "Pachycephalosaurus"
         }
+    }
+
+    /// Clubs a fence next to it every few seconds, knocking it down.
+    var smashesFences: Bool {
+        self == .ankylosaurus
+    }
+
+    /// Charges in bursts and headbutts towers it passes, stunning them.
+    var headbutts: Bool {
+        self == .pachycephalosaurus
     }
 
     /// Flyers go straight over the maze and can't be reached by flares.
@@ -33,7 +51,11 @@ enum DinoKind {
 
     /// Flat damage soaked from every hit. Weak, fast shots barely scratch armor.
     var armor: CGFloat {
-        self == .stegosaurus ? 5 : 0
+        switch self {
+        case .stegosaurus: 5
+        case .ankylosaurus: 4
+        default: 0
+        }
     }
 
     var plural: String {
@@ -46,6 +68,8 @@ enum DinoKind {
         case .spinosaurus: "spinosaurs"
         case .rex: "T-Rex"
         case .pterodactyl: "pterodactyls"
+        case .ankylosaurus: "ankylosaurs"
+        case .pachycephalosaurus: "pachys"
         }
     }
 
@@ -59,6 +83,8 @@ enum DinoKind {
         case .spinosaurus: 400
         case .rex: 1300
         case .pterodactyl: 40
+        case .ankylosaurus: 280
+        case .pachycephalosaurus: 110
         }
     }
 
@@ -73,6 +99,8 @@ enum DinoKind {
         case .spinosaurus: 0.9
         case .rex: 0.6
         case .pterodactyl: 1.3
+        case .ankylosaurus: 0.7
+        case .pachycephalosaurus: 1.3
         }
     }
 
@@ -87,6 +115,8 @@ enum DinoKind {
         case .spinosaurus: 20
         case .rex: 80
         case .pterodactyl: 5
+        case .ankylosaurus: 16
+        case .pachycephalosaurus: 9
         }
     }
 
@@ -101,6 +131,8 @@ enum DinoKind {
         case .spinosaurus: 3
         case .rex: 10
         case .pterodactyl: 1
+        case .ankylosaurus: 2
+        case .pachycephalosaurus: 1
         }
     }
 }
@@ -130,6 +162,12 @@ final class Dino: SKNode {
     var spitTimer: TimeInterval = 2
     /// Daily challenge speed boost.
     var speedScale: CGFloat = 1
+    /// Seconds until an ankylosaur smashes or a pachy charges again.
+    var actionTimer: TimeInterval = 3
+    /// A pachy's charge: faster for a moment.
+    var chargeLeft: TimeInterval = 0
+    /// Seconds until a pachy can headbutt another tower.
+    var headbuttCooldown: TimeInterval = 0
     private var slowTimeLeft: TimeInterval = 0
     private var heading: CGFloat = -.pi / 2
     private let art: SKSpriteNode
@@ -205,7 +243,7 @@ final class Dino: SKNode {
 
     /// Cells per second right now, after tranquilizers.
     var currentSpeed: CGFloat {
-        kind.moveSpeed * slowFactor * speedScale
+        kind.moveSpeed * slowFactor * speedScale * (chargeLeft > 0 ? 2.2 : 1)
     }
 
     func tick(_ dt: TimeInterval) {

@@ -12,6 +12,8 @@ private final class Shot {
     let source: BuildKind
     /// The tower that fired it, for that tower's kill and damage count.
     weak var tower: Tower?
+    /// Cannon shells blast ground dinos; flak bursts catch flyers.
+    let splashGround: Bool
     var done = false
 
     init(
@@ -20,6 +22,7 @@ private final class Shot {
     ) {
         self.source = source
         self.tower = tower
+        splashGround = tower?.splashHitsGround ?? false
         self.node = node
         self.target = target
         self.damage = damage
@@ -152,6 +155,9 @@ final class GameScene: SKScene {
     private var darkness: SKSpriteNode?
     /// Whether this game has explained venom yet.
     private var warnedAboutSpit = false
+    /// Whether this game has explained ankylosaurs and pachys yet.
+    private var warnedAboutSmash = false
+    private var warnedAboutHeadbutt = false
     /// Optional ad rewards: one revive per game, bonus cash every 5 waves.
     private var revivedThisGame = false
     private var lastAdBonusWave = -99
@@ -272,7 +278,7 @@ final class GameScene: SKScene {
         drawBoard()
 
         // Bake every dino's walk cycle now so the first spawn doesn't hitch
-        for kind in [DinoKind.compy, .raptor, .dilophosaurus, .triceratops, .stegosaurus, .spinosaurus, .rex, .pterodactyl] {
+        for kind in DinoKind.all {
             _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: screenScale)
         }
 
@@ -289,6 +295,8 @@ final class GameScene: SKScene {
         burns = []
         stats = GameStats()
         warnedAboutSpit = false
+        warnedAboutSmash = false
+        warnedAboutHeadbutt = false
         revivedThisGame = false
         lastAdBonusWave = -99
         airstrikeReady = true
@@ -635,7 +643,17 @@ final class GameScene: SKScene {
                 return
             }
             if hits.contains("upgrade"), let tower = selectedTower {
-                upgrade(tower)
+                if tower.needsBranch {
+                    showBranchChoice(for: tower)
+                } else {
+                    upgrade(tower)
+                    showPanel(for: tower)
+                }
+                return
+            }
+            if let picked = hits.first(where: { $0.hasPrefix("pick-") }),
+               let branch = TowerBranch(rawValue: String(picked.dropFirst(5))), let tower = selectedTower {
+                upgrade(tower, branch: branch)
                 showPanel(for: tower)
                 return
             }
@@ -985,7 +1003,7 @@ final class GameScene: SKScene {
             towers: towers.values.map {
                 SavedGame.SavedTower(
                     kind: "\($0.kind)", col: $0.cell.col, row: $0.cell.row,
-                    level: $0.level, targeting: "\($0.targeting)"
+                    level: $0.level, targeting: "\($0.targeting)", branch: $0.branch?.rawValue
                 )
             },
             kills: stats.kills,
@@ -1018,7 +1036,7 @@ final class GameScene: SKScene {
             let tower = Tower(kind: kind, cell: cell, cellSize: cellSize)
             tower.position = point(for: cell)
             while tower.level < saved.level, tower.upgradeCost != nil {
-                tower.upgrade()
+                tower.upgrade(branch: saved.branch.flatMap { TowerBranch(rawValue: $0) })
             }
             tower.targeting = Targeting.allCases.first { "\($0)" == saved.targeting } ?? .first
             world.addChild(tower)
@@ -1146,7 +1164,7 @@ final class GameScene: SKScene {
         saveProgress()
     }
 
-    private func upgrade(_ tower: Tower) {
+    private func upgrade(_ tower: Tower, branch: TowerBranch? = nil) {
         guard let cost = tower.upgradeCost else {
             hud.flash(tower.kind == .fence ? "Fences can't be upgraded" : "Already max level")
             return
@@ -1156,7 +1174,7 @@ final class GameScene: SKScene {
             return
         }
         cash -= cost
-        tower.upgrade()
+        tower.upgrade(branch: branch)
         if !waveActive {
             undoSteps.append(.upgraded(tower, cost: cost))
         }
@@ -1164,7 +1182,7 @@ final class GameScene: SKScene {
         SoundBank.shared.play(.upgrade)
         Haptics.punch()
         tutorial?.handle(.upgraded)
-        hud.flash("\(tower.kind.title) level \(tower.level)")
+        hud.flash("\(tower.title) level \(tower.level)")
         if tower.level == Tower.maxLevel {
             award(.fullyLoaded)
         }
@@ -1367,6 +1385,7 @@ final class GameScene: SKScene {
             burnGround(dt)
             sparkFences(dt)
             spitVenom(dt)
+            dinoTricks(dt)
             checkWaveEnd()
         }
     }
@@ -1480,24 +1499,83 @@ final class GameScene: SKScene {
             let reach = tower.range * cellSize
             let inRange = dinos.filter {
                 !$0.isDead
-                    && ($0.kind.flies ? tower.kind.hitsAir : tower.kind.hitsGround)
+                    && ($0.kind.flies ? tower.hitsAir : tower.hitsGround)
                     && distance($0.position, tower.position) <= reach
             }
             guard !inRange.isEmpty else { continue }
-            tower.cooldown = tower.kind.fireInterval / (tower.overdriveLeft > 0 ? 3 : 1)
+            tower.cooldown = tower.fireInterval / (tower.overdriveLeft > 0 ? 3 : 1)
 
             if tower.kind == .flare {
                 tower.showFire()
                 pulse(from: tower, radius: reach)
                 SoundBank.shared.play(.flare)
                 for dino in inRange {
-                    hit(dino, for: tower.damage, source: .flare, by: tower)
+                    hit(dino, for: tower.damage, armorApplies: !tower.ignoresArmor, source: .flare, by: tower)
                 }
             } else if let target = pickTarget(from: inRange, for: tower) {
-                // Shoot whichever dino is closest to escaping.
-                tower.aim(at: target.position)
-                fire(from: tower, at: target)
+                if tower.kind == .shock {
+                    tower.showFire()
+                    zap(from: tower, first: target)
+                } else {
+                    tower.aim(at: target.position)
+                    fire(from: tower, at: target)
+                }
             }
+        }
+    }
+
+    /// Lightning from a shock pylon, jumping from dino to nearby dino.
+    private func zap(from tower: Tower, first: Dino) {
+        var struck = [first]
+        var current = first
+        let jump = cellSize * 1.3
+        while struck.count <= tower.chain {
+            let from = current
+            let candidates = dinos.filter { candidate in
+                !candidate.isDead && !candidate.kind.flies && !struck.contains { $0 === candidate }
+                    && distance(candidate.position, from.position) <= jump
+            }
+            guard let next = candidates.min(by: { distance($0.position, from.position) < distance($1.position, from.position) }) else { break }
+            struck.append(next)
+            current = next
+        }
+        bolt(through: [tower.position] + struck.map { $0.position })
+        SoundBank.shared.play(.zap, volume: 1)
+        var damage = tower.damage
+        for dino in struck {
+            if tower.branch == .arc {
+                dino.slow(to: 0.15, for: 0.4)
+            }
+            hit(dino, for: damage, source: .shock, by: tower)
+            // Each jump loses a little punch
+            damage *= 0.8
+        }
+    }
+
+    /// A jagged lightning bolt through the points, gone in a flash.
+    private func bolt(through points: [CGPoint]) {
+        guard points.count > 1 else { return }
+        let path = CGMutablePath()
+        path.move(to: points[0])
+        for (a, b) in zip(points, points.dropFirst()) {
+            let dx = b.x - a.x
+            let dy = b.y - a.y
+            let length = max(1, hypot(dx, dy))
+            for step in 1...4 {
+                let f = CGFloat(step) / 4
+                let jitter = step == 4 ? 0 : CGFloat.random(in: -1...1) * cellSize * 0.14
+                path.addLine(to: CGPoint(x: a.x + dx * f - dy / length * jitter, y: a.y + dy * f + dx / length * jitter))
+            }
+        }
+        for (width, color) in [(CGFloat(5), ParkArt.shock.withAlphaComponent(0.6)), (CGFloat(2), ParkArt.shockLight)] {
+            let line = SKShapeNode(path: path)
+            line.strokeColor = color
+            line.lineWidth = width
+            line.lineCap = .round
+            line.lineJoin = .round
+            line.zPosition = 7.5
+            world.addChild(line)
+            line.run(.sequence([.wait(forDuration: 0.06), .fadeOut(withDuration: 0.12), .removeFromParent()]))
         }
     }
 
@@ -1520,7 +1598,7 @@ final class GameScene: SKScene {
         node.position = CGPoint(x: tower.position.x + cos(angle) * cellSize * 0.45, y: tower.position.y + sin(angle) * cellSize * 0.45)
         node.zPosition = 7
         world.addChild(node)
-        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow, splash: tower.kind.splash, source: tower.kind, tower: tower))
+        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.slow, splash: tower.splash, source: tower.kind, tower: tower))
     }
 
     private func moveShots(_ dt: TimeInterval) {
@@ -1540,15 +1618,17 @@ final class GameScene: SKScene {
                     flakBurst(at: shot.target.position)
                     let reach = shot.splash * cellSize
                     let center = shot.target.position
-                    for other in dinos where other !== shot.target && other.kind.flies && distance(other.position, center) <= reach {
-                        hit(other, for: shot.damage * 0.5, source: .flak, by: shot.tower)
+                    for other in dinos where other !== shot.target
+                        && other.kind.flies != shot.splashGround && distance(other.position, center) <= reach {
+                        hit(other, for: shot.damage * 0.5, source: shot.source, by: shot.tower)
                     }
                 } else {
                     puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
                     SoundBank.shared.play(.hit)
                 }
                 // Only flak is built for the sky; everything else does half damage to flyers
-                let airPenalty: CGFloat = shot.target.kind.flies && shot.splash == 0 ? 0.5 : 1
+                // Skyhammer flak can hit the ground, but at half damage
+                let airPenalty: CGFloat = shot.target.kind.flies != (shot.source == .flak) ? 0.5 : 1
                 hit(shot.target, for: shot.damage * airPenalty, slow: shot.slow, source: shot.source, by: shot.tower)
                 shot.node.removeFromParent()
                 shot.done = true
@@ -1742,6 +1822,60 @@ final class GameScene: SKScene {
         }
     }
 
+    // MARK: - Ankylosaurs and pachys
+
+    /// Ankylosaurs club down fences next to them; pachys charge and headbutt towers.
+    private func dinoTricks(_ dt: TimeInterval) {
+        for dino in dinos where !dino.isDead && dino.flight == nil {
+            if dino.kind.smashesFences {
+                dino.actionTimer -= dt
+                guard dino.actionTimer <= 0 else { continue }
+                let around = [(1, 0), (-1, 0), (0, 1), (0, -1)].map { Cell(col: dino.cell.col + $0.0, row: dino.cell.row + $0.1) }
+                if let fence = around.compactMap({ towers[$0] }).first(where: { $0.kind == .fence }) {
+                    dino.actionTimer = 5
+                    smash(fence)
+                } else {
+                    dino.actionTimer = 0.5
+                }
+            } else if dino.kind.headbutts {
+                dino.chargeLeft = max(0, dino.chargeLeft - dt)
+                dino.headbuttCooldown = max(0, dino.headbuttCooldown - dt)
+                dino.actionTimer -= dt
+                if dino.actionTimer <= 0 {
+                    dino.actionTimer = 5
+                    dino.chargeLeft = 1.2
+                }
+                guard dino.headbuttCooldown <= 0 else { continue }
+                let reach = cellSize * 1.1
+                guard let tower = towers.values.first(where: {
+                    $0.kind != .fence && $0.disabledLeft <= 0 && distance($0.position, dino.position) <= reach
+                }) else { continue }
+                dino.headbuttCooldown = 6
+                tower.stun(for: 2)
+                puff(at: tower.position, color: Palette.warning)
+                SoundBank.shared.play(.hit)
+                if !warnedAboutHeadbutt {
+                    warnedAboutHeadbutt = true
+                    hud.flash("Pachys headbutt towers, stunning them for 2 seconds")
+                }
+            }
+        }
+    }
+
+    /// An ankylosaur's tail club knocks a fence flat, opening a gap in the maze.
+    private func smash(_ fence: Tower) {
+        undoSteps.removeAll { $0.tower === fence }
+        puff(at: fence.position, color: UIColor(hex: 0xC3C8BB))
+        floatText("SMASH!", at: fence.position)
+        SoundBank.shared.play(.hit)
+        Haptics.tap()
+        removeTower(fence)
+        if !warnedAboutSmash {
+            warnedAboutSmash = true
+            hud.flash("Ankylosaurs smash fences! Back your walls with towers")
+        }
+    }
+
     // MARK: - Night
 
     /// For night parks: darkness over the board with soft pools of light around
@@ -1872,6 +2006,14 @@ final class GameScene: SKScene {
             napalm(at: tower.position, radius: reach * 1.1, damagePerSecond: tower.damage * 1.5)
         case .flak:
             barrage(from: tower, radius: reach * 1.3)
+        case .shock:
+            let targets = dinos.filter { !$0.isDead && !$0.kind.flies && distance($0.position, tower.position) <= reach * 1.2 }
+            for dino in targets {
+                bolt(through: [tower.position, dino.position])
+                hit(dino, for: tower.damage * 4, source: .shock, by: tower)
+            }
+            SoundBank.shared.play(.zap, volume: 1)
+            shakeWorld()
         case .fence:
             break
         }
@@ -2080,7 +2222,7 @@ final class GameScene: SKScene {
             : "\(tower.kind.title)  ·  Level \(tower.level) of \(Tower.maxLevel)"
         let titleY: CGFloat = height / 2 - 24
         let aims = tower.kind != .fence && tower.kind != .flare
-        let titleLabel = makeLabel(aims ? "\(tower.kind.title) · Lv \(tower.level)/\(Tower.maxLevel)" : title, size: aims ? 14 : 15, font: Fonts.heavy)
+        let titleLabel = makeLabel(aims ? "\(tower.title) · Lv \(tower.level)/\(Tower.maxLevel)" : title, size: aims ? 14 : 15, font: Fonts.heavy)
         titleLabel.name = "panel"
         if aims {
             titleLabel.horizontalAlignmentMode = .left
@@ -2110,7 +2252,7 @@ final class GameScene: SKScene {
             let upgradeTitle: String
             let canAfford: Bool
             if let cost = tower.upgradeCost {
-                upgradeTitle = "Upgrade $\(cost)"
+                upgradeTitle = tower.needsBranch ? "Pick path $\(cost)" : "Upgrade $\(cost)"
                 canAfford = cash >= cost
             } else {
                 upgradeTitle = "Max level"
@@ -2146,6 +2288,78 @@ final class GameScene: SKScene {
         }
         let x = min(max(towerPoint.x, width / 2 + 8), size.width - width / 2 - 8)
         panel.position = CGPoint(x: x, y: y)
+        panel.setScale(0.85)
+        panel.run(.scale(to: 1, duration: 0.1))
+        addChild(panel)
+        towerPanel = panel
+    }
+
+    /// Level 3 to 4: two cards, one for each way the tower can specialize.
+    private func showBranchChoice(for tower: Tower) {
+        guard let cost = tower.upgradeCost else { return }
+        closePanel()
+        selectedTower = tower
+        let width = min(size.width - 16, 310)
+        let height: CGFloat = 190
+        let panel = SKNode()
+        panel.zPosition = 90
+
+        let background = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 14)
+        background.name = "panel"
+        background.fillColor = Palette.bar.withAlphaComponent(0.97)
+        background.strokeColor = Palette.warning.withAlphaComponent(0.55)
+        background.lineWidth = 1.5
+        panel.addChild(background)
+
+        let heading = makeLabel("LEVEL 4: PICK A PATH FOR THIS \(tower.kind.title.uppercased())", size: 12, font: Fonts.heavy, color: Palette.warning)
+        heading.name = "panel"
+        heading.position = CGPoint(x: 0, y: height / 2 - 20)
+        heading.setScale(min(1, (width - 24) / max(1, heading.frame.width)))
+        panel.addChild(heading)
+
+        let options = TowerBranch.options(for: tower.kind)
+        let cardWidth = (width - 36) / 2
+        let cardHeight: CGFloat = 140
+        for (i, option) in options.enumerated() {
+            let name = "pick-\(option.rawValue)"
+            let card = SKShapeNode(rectOf: CGSize(width: cardWidth, height: cardHeight), cornerRadius: 12)
+            card.name = name
+            card.fillColor = Palette.panel
+            card.strokeColor = option.color
+            card.lineWidth = 2
+            card.position = CGPoint(x: -width / 2 + 12 + cardWidth / 2 + CGFloat(i) * (cardWidth + 12), y: -12)
+
+            let title = makeLabel(option.title, size: 17, font: Fonts.heavy, color: option.color)
+            title.name = name
+            title.position = CGPoint(x: 0, y: cardHeight / 2 - 22)
+            card.addChild(title)
+
+            let detail = SKLabelNode(fontNamed: Fonts.bold)
+            detail.name = name
+            detail.text = option.detail
+            detail.fontSize = 12
+            detail.fontColor = Palette.text
+            detail.numberOfLines = 0
+            detail.preferredMaxLayoutWidth = cardWidth - 16
+            detail.lineBreakMode = .byWordWrapping
+            detail.horizontalAlignmentMode = .center
+            detail.verticalAlignmentMode = .top
+            detail.position = CGPoint(x: 0, y: cardHeight / 2 - 40)
+            card.addChild(detail)
+
+            let price = makeLabel("$\(cost)", size: 15, font: Fonts.heavy, color: cash >= cost ? Palette.warning : Palette.danger)
+            price.name = name
+            price.position = CGPoint(x: 0, y: -cardHeight / 2 + 18)
+            card.addChild(price)
+            panel.addChild(card)
+        }
+
+        let towerPoint = convert(tower.position, from: world)
+        var y = towerPoint.y + cellSize * 0.6 + height / 2 + 6
+        if y + height / 2 > size.height - topHeight - 4 {
+            y = towerPoint.y - cellSize * 0.6 - height / 2 - 6
+        }
+        panel.position = CGPoint(x: size.width / 2, y: max(bottomHeight + height / 2 + 4, y))
         panel.setScale(0.85)
         panel.run(.scale(to: 1, duration: 0.1))
         addChild(panel)

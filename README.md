@@ -59,6 +59,9 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 | 🎯 Turret | $35 | Fast, steady damage. Your main killer. |
 | 🔥 Flare | $50 | Short range burst that burns every dino around it. |
 | Flak | $45 | Anti-air only. Longest range of any tower, and each shell bursts to hit nearby flyers too. Can't hit anything on the ground. |
+| ⚡ Shock | $60 | Lightning that jumps from dino to dino (2 to 4 targets, more with upgrades). Ground only. Ability: **Overload** zaps everything in range for 4x damage. |
+
+**Branching upgrades:** going from level 3 to 4, every tower picks one of two paths, shown as a colored letter badge on the tower: Tranq (Sedative or Sniper), Turret (Minigun or Cannon), Flare (Inferno or Phosphor), Flak (Hailstorm or Skyhammer), Shock (Storm or Arc).
 
 ### Dinos
 
@@ -72,6 +75,8 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 | Dilophosaurus | Yellow-green with a fanned orange frill and red crests. Every 4 seconds it spits venom at the nearest tower within 2 squares, which can't fire for 3 seconds. From wave 19 |
 | Spinosaurus | Teal with a red back sail, 400 health. It swims, so on Jungle River it cuts straight across the river instead of using the bridges. From wave 17 |
 | Pterodactyl | Flies straight over the maze from the gate to the chopper, weaving as it goes. Flak hits it at full damage; turrets and tranqs only do half, and flares can't reach it. First flock on wave 11, then every third wave, a big flock on boss waves, and a few on most waves from 30 on |
+| Ankylosaurus | Armored tank with a tail club. Every few seconds it smashes a fence next to it, opening a gap in your maze. Back key walls with towers. From wave 22 |
+| Pachycephalosaurus | Domed head, charges in bursts, and headbutts towers it passes, stunning them for 2 seconds. From wave 24 |
 
 The dinos are cartoon cutouts drawn in code (`DinoArt.swift`): body, tail, legs, and head are drawn separately, then baked into a 16 frame walk cycle for each dino when a game starts. They turn smoothly into corners, and tranqs slow their walk animation along with their speed.
 

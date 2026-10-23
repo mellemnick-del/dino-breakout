@@ -20,6 +20,8 @@ enum ParkArt {
     static let hazard = UIColor(hex: 0xF3C64A)
     static let hazardInk = UIColor(hex: 0x241D05)
     static let tranq = UIColor(hex: 0x3F86C9)
+    static let shock = UIColor(hex: 0x5BC0F2)
+    static let shockLight = UIColor(hex: 0xD8F3FF)
     static let tranqLight = UIColor(hex: 0x8CC5F0)
     static let flare = UIColor(hex: 0xE2742A)
     static let flareLight = UIColor(hex: 0xFFB35C)
@@ -719,6 +721,20 @@ enum ParkArt {
                 ctx.fill(CGRect(x: -h, y: y, width: p * 0.12, height: p * 0.08))
                 ctx.fill(CGRect(x: h - p * 0.12, y: y, width: p * 0.12, height: p * 0.08))
             }
+        case .shock:
+            // Lightning-blue corner bolts
+            ctx.setFillColor(shock.cgColor)
+            for (dx, dy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                let sx = CGFloat(dx)
+                let sy = CGFloat(dy)
+                ctx.move(to: CGPoint(x: sx * h, y: sy * (h - p * 0.3)))
+                ctx.addLine(to: CGPoint(x: sx * (h - p * 0.14), y: sy * (h - p * 0.12)))
+                ctx.addLine(to: CGPoint(x: sx * (h - p * 0.08), y: sy * (h - p * 0.18)))
+                ctx.addLine(to: CGPoint(x: sx * (h - p * 0.3), y: sy * h))
+                ctx.addLine(to: CGPoint(x: sx * h, y: sy * h))
+                ctx.closePath()
+                ctx.fillPath()
+            }
         case .fence:
             break
         }
@@ -768,6 +784,7 @@ enum ParkArt {
         case .turret: drawTurretHead(ctx, level: level, cell: c)
         case .flare: drawFlareHead(ctx, level: level, cell: c, frame: frame)
         case .flak: drawFlakHead(ctx, level: level, cell: c)
+        case .shock: drawShockHead(ctx, level: level, cell: c)
         case .fence: break
         }
         if level >= 4 && kind != .fence {
@@ -896,6 +913,25 @@ enum ParkArt {
         ctx.strokePath()
         circle(ctx, c * 0.07, 0, c * 0.035)
         fill(ctx, rescue)
+    }
+
+    /// A tesla coil: insulator rings around a glowing orb.
+    private static func drawShockHead(_ ctx: CGContext, level: Int, cell c: CGFloat) {
+        let lw = lineWidth(c)
+        for i in 0..<4 {
+            let a = CGFloat(i) * .pi / 2 + .pi / 4
+            circle(ctx, cos(a) * c * 0.22, sin(a) * c * 0.22, c * 0.05)
+            ink(ctx, steelDark, lw)
+        }
+        let rings = level >= 3 ? 3 : 2
+        for i in 0..<rings {
+            circle(ctx, 0, 0, c * (0.2 - CGFloat(i) * 0.045))
+            ink(ctx, i % 2 == 0 ? steel : UIColor(hex: 0xB0703A), lw)
+        }
+        circle(ctx, 0, 0, c * 0.085)
+        ink(ctx, shock, lw)
+        circle(ctx, -c * 0.02, c * 0.02, c * 0.035)
+        fill(ctx, shockLight)
     }
 
     private static func drawFlakHead(_ ctx: CGContext, level: Int, cell c: CGFloat) {

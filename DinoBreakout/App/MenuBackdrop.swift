@@ -36,7 +36,7 @@ final class MenuBackdrop: SKScene {
             addChild(rock)
         }
 
-        for kind in [DinoKind.compy, .raptor, .dilophosaurus, .triceratops, .stegosaurus, .spinosaurus, .rex, .pterodactyl] {
+        for kind in DinoKind.all {
             _ = DinoArt.bake(kind, cellSize: cellSize, screenScale: scale)
         }
         for _ in 0..<3 {
@@ -56,7 +56,7 @@ final class MenuBackdrop: SKScene {
 
     /// Sends one dino walking across the screen in a gentle line.
     private func wander(startAnywhere: Bool) {
-        let kinds: [DinoKind] = [.compy, .compy, .raptor, .raptor, .dilophosaurus, .triceratops, .stegosaurus, .spinosaurus, .rex, .pterodactyl, .pterodactyl]
+        let kinds: [DinoKind] = [.compy, .compy, .raptor, .raptor, .dilophosaurus, .triceratops, .stegosaurus, .spinosaurus, .rex, .pterodactyl, .pterodactyl, .ankylosaurus, .pachycephalosaurus]
         let kind = kinds.randomElement() ?? .raptor
         let baked = DinoArt.bake(kind, cellSize: cellSize, screenScale: ParkArt.screenScale)
         let style = kind.style
