@@ -37,6 +37,9 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 - **Abilities:** every tower's panel has a special move that recharges (25 seconds, 30 for napalm): Tranq **Sleep Gas** nearly freezes everything close by for 3 seconds, Turret **Overdrive** fires three times as fast for 5 seconds, Flare **Napalm** leaves a burning patch that ignores armor, and Flak **Barrage** blasts every flyer in range.
 - **Aim:** towers that shoot have an Aim chip in their panel: First (closest to the helipad), Strongest, Closest, or Flyers.
 - **Air strike:** the last button in the build bar. Tap it, then tap the board, and the rescue chopper strafes that whole row. Once per wave.
+- **Boss bar:** while a T-Rex is loose, its health shows in a red bar across the top of the board.
+- **Tower stats:** each tower's panel shows its kills and total damage, so you can see who's pulling their weight.
+- **Perfect wave:** clear a wave without anything reaching the helipad for bonus cash. Big banners announce each wave, boss waves, and clears.
 - **Interest:** clearing a wave pays 5% interest on the cash you saved, up to $50.
 - **Stats:** the game over screen shows dinos taken down, your MVP tower's share of the damage, and time played.
 - **Tutorial:** the first game on Paddock B walks you through fences, a turret, a wave, and an upgrade. Replay it from Settings.

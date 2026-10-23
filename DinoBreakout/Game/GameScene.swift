@@ -10,13 +10,16 @@ private final class Shot {
     let splash: CGFloat
     /// The kind of tower that fired it, for the end of game stats.
     let source: BuildKind
+    /// The tower that fired it, for that tower's kill and damage count.
+    weak var tower: Tower?
     var done = false
 
     init(
         node: SKSpriteNode, target: Dino, damage: CGFloat, slow: (factor: CGFloat, duration: TimeInterval)?,
-        splash: CGFloat = 0, source: BuildKind
+        splash: CGFloat = 0, source: BuildKind, tower: Tower? = nil
     ) {
         self.source = source
+        self.tower = tower
         self.node = node
         self.target = target
         self.damage = damage
@@ -313,6 +316,10 @@ final class GameScene: SKScene {
             addChild(guide.node)
             tutorial = guide
         }
+        world.alpha = 0
+        world.run(.fadeIn(withDuration: 0.4))
+        hud.alpha = 0
+        hud.run(.fadeIn(withDuration: 0.25))
         if resumed != nil {
             hud.flash("Welcome back. Wave \(wavesStarted) cleared, wave \(wavesStarted + 1) is next")
         } else if let challenge {
@@ -1205,6 +1212,11 @@ final class GameScene: SKScene {
         setGate(open: true)
         SoundBank.shared.play(.alarm)
         tutorial?.handle(.waveStarted)
+        if wave.contains(where: { $0.kind == .rex }) {
+            banner("BOSS WAVE \(wavesStarted)", subtitle: "Something big is coming", color: Palette.danger)
+        } else {
+            banner("WAVE \(wavesStarted)", subtitle: nil)
+        }
         if wave.contains(where: { $0.kind.flies }) {
             hud.flash("Wave \(wavesStarted): pterodactyls incoming! Flak hits them hardest")
             SoundBank.shared.play(.screech)
@@ -1295,7 +1307,10 @@ final class GameScene: SKScene {
         let bonus = 5 + min(wavesStarted, Waves.total)
         // 5% interest on cash you saved, up to $50, rewards banking for a big upgrade
         let interest = min(50, cash / 20)
-        cash += bonus + interest
+        // Perfect wave: nothing reached the helipad
+        let perfect = lives == livesAtWaveStart
+        let perfectBonus = perfect ? 5 + wavesStarted / 2 : 0
+        cash += bonus + interest + perfectBonus
         if endless || wavesStarted < waveGoal {
             saveProgress()
         }
@@ -1310,6 +1325,12 @@ final class GameScene: SKScene {
         } else {
             hud.setSendEnabled(true)
             hud.flash(interest > 0 ? "Wave cleared! +$\(bonus), +$\(interest) interest" : "Wave cleared! +$\(bonus)")
+            if perfect {
+                banner("PERFECT WAVE", subtitle: "Nothing got through · +$\(perfectBonus)")
+                Haptics.success()
+            } else {
+                banner("WAVE \(wavesStarted) CLEARED", subtitle: "+$\(bonus + interest)", color: Palette.text)
+            }
         }
     }
 
@@ -1321,6 +1342,14 @@ final class GameScene: SKScene {
         guard !isOver, pauseMenu == nil, dt > 0 else { return }
         stats.playTime += dt
         hud.setRemaining(waveActive ? spawnQueue.count + dinos.count : nil, canUndo: !undoSteps.isEmpty)
+        let rexes = dinos.filter { $0.kind == .rex && !$0.isDead }
+        if rexes.isEmpty {
+            hud.setBoss(health: nil, count: 0)
+        } else {
+            let left = rexes.reduce(CGFloat(0)) { $0 + $1.health }
+            let full = rexes.reduce(CGFloat(0)) { $0 + $1.maxHealth }
+            hud.setBoss(health: left / max(1, full), count: rexes.count)
+        }
         if waveActive {
             hintTimer -= dt
             if hintTimer <= 0 {
@@ -1462,7 +1491,7 @@ final class GameScene: SKScene {
                 pulse(from: tower, radius: reach)
                 SoundBank.shared.play(.flare)
                 for dino in inRange {
-                    hit(dino, for: tower.damage, source: .flare)
+                    hit(dino, for: tower.damage, source: .flare, by: tower)
                 }
             } else if let target = pickTarget(from: inRange, for: tower) {
                 // Shoot whichever dino is closest to escaping.
@@ -1491,7 +1520,7 @@ final class GameScene: SKScene {
         node.position = CGPoint(x: tower.position.x + cos(angle) * cellSize * 0.45, y: tower.position.y + sin(angle) * cellSize * 0.45)
         node.zPosition = 7
         world.addChild(node)
-        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow, splash: tower.kind.splash, source: tower.kind))
+        shots.append(Shot(node: node, target: target, damage: tower.damage, slow: tower.kind.slow, splash: tower.kind.splash, source: tower.kind, tower: tower))
     }
 
     private func moveShots(_ dt: TimeInterval) {
@@ -1512,7 +1541,7 @@ final class GameScene: SKScene {
                     let reach = shot.splash * cellSize
                     let center = shot.target.position
                     for other in dinos where other !== shot.target && other.kind.flies && distance(other.position, center) <= reach {
-                        hit(other, for: shot.damage * 0.5, source: .flak)
+                        hit(other, for: shot.damage * 0.5, source: .flak, by: shot.tower)
                     }
                 } else {
                     puff(at: shot.target.position, color: shot.slow == nil ? UIColor(hex: 0xFFE27A) : ParkArt.tranqLight)
@@ -1520,7 +1549,7 @@ final class GameScene: SKScene {
                 }
                 // Only flak is built for the sky; everything else does half damage to flyers
                 let airPenalty: CGFloat = shot.target.kind.flies && shot.splash == 0 ? 0.5 : 1
-                hit(shot.target, for: shot.damage * airPenalty, slow: shot.slow, source: shot.source)
+                hit(shot.target, for: shot.damage * airPenalty, slow: shot.slow, source: shot.source, by: shot.tower)
                 shot.node.removeFromParent()
                 shot.done = true
             } else {
@@ -1533,7 +1562,8 @@ final class GameScene: SKScene {
 
     private func hit(
         _ dino: Dino, for amount: CGFloat,
-        slow: (factor: CGFloat, duration: TimeInterval)? = nil, armorApplies: Bool = true, source: BuildKind? = nil
+        slow: (factor: CGFloat, duration: TimeInterval)? = nil, armorApplies: Bool = true, source: BuildKind? = nil,
+        by tower: Tower? = nil
     ) {
         guard !dino.isDead else { return }
         defer {
@@ -1545,7 +1575,9 @@ final class GameScene: SKScene {
         }
         // Armor soaks a flat amount from every hit, but something always gets through
         let dealt = armorApplies ? max(1, amount - dino.kind.armor) : amount
+        tower?.damageDealt += min(dealt, dino.health)
         if dino.takeDamage(dealt) {
+            tower?.kills += 1
             kill(dino)
         }
     }
@@ -1907,7 +1939,7 @@ final class GameScene: SKScene {
                 guard let self, let dino, !dino.isDead else { return }
                 self.flakBurst(at: dino.position)
                 SoundBank.shared.play(.flak)
-                self.hit(dino, for: tower.damage * 3, source: .flak)
+                self.hit(dino, for: tower.damage * 3, source: .flak, by: tower)
             }
         }
     }
@@ -2030,8 +2062,9 @@ final class GameScene: SKScene {
 
         let width: CGFloat = 230
         let hasAbility = tower.kind.abilityName != nil
-        let height: CGFloat = hasAbility ? 152 : 100
-        let rowY: CGFloat = hasAbility ? 12 : -14
+        let showsStats = tower.kind != .fence
+        let height: CGFloat = (hasAbility ? 152 : 100) + (showsStats ? 20 : 0)
+        let rowY: CGFloat = hasAbility ? (showsStats ? 2 : 12) : (showsStats ? -24 : -14)
         let panel = SKNode()
         panel.zPosition = 90
 
@@ -2045,7 +2078,7 @@ final class GameScene: SKScene {
         let title = tower.kind == .fence
             ? "Electric fence"
             : "\(tower.kind.title)  ·  Level \(tower.level) of \(Tower.maxLevel)"
-        let titleY: CGFloat = hasAbility ? 52 : 26
+        let titleY: CGFloat = height / 2 - 24
         let aims = tower.kind != .fence && tower.kind != .flare
         let titleLabel = makeLabel(aims ? "\(tower.kind.title) · Lv \(tower.level)/\(Tower.maxLevel)" : title, size: aims ? 14 : 15, font: Fonts.heavy)
         titleLabel.name = "panel"
@@ -2058,6 +2091,16 @@ final class GameScene: SKScene {
             titleLabel.position = CGPoint(x: 0, y: titleY)
         }
         panel.addChild(titleLabel)
+        if showsStats {
+            let damage = tower.damageDealt >= 1000
+                ? String(format: "%.1fk", Double(tower.damageDealt) / 1000)
+                : "\(Int(tower.damageDealt))"
+            let statsLabel = makeLabel("\(tower.kills) kills  ·  \(damage) damage", size: 11, color: Palette.muted)
+            statsLabel.name = "panel"
+            statsLabel.horizontalAlignmentMode = .left
+            statsLabel.position = CGPoint(x: -width / 2 + 14, y: titleY - 21)
+            panel.addChild(statsLabel)
+        }
 
         let sellTitle = "Sell $\(tower.sellValue)"
         if tower.kind == .fence {
@@ -2087,10 +2130,10 @@ final class GameScene: SKScene {
                                           fill: ready ? SKColor(red: 0.25, green: 0.53, blue: 0.79, alpha: 1) : Palette.panel,
                                           text: ready ? Palette.text : Palette.muted,
                                           outlined: !ready,
-                                          y: -40, width: width - 24, height: 42, fontSize: 15))
+                                          y: showsStats ? -50 : -40, width: width - 24, height: 42, fontSize: 15))
                 let hint = makeLabel(tower.kind.abilityDetail, size: 11, color: Palette.muted)
                 hint.name = "panel"
-                hint.position = CGPoint(x: 0, y: -66)
+                hint.position = CGPoint(x: 0, y: showsStats ? -76 : -66)
                 hint.setScale(min(1, (width - 16) / max(1, hint.frame.width)))
                 panel.addChild(hint)
             }
@@ -2283,6 +2326,41 @@ final class GameScene: SKScene {
         world.addChild(label)
         label.run(.sequence([
             .group([.moveBy(x: 0, y: cellSize * 0.6, duration: 0.6), .fadeOut(withDuration: 0.6)]),
+            .removeFromParent()
+        ]))
+    }
+
+    /// A big centered banner over the board for wave starts and clears.
+    private func banner(_ title: String, subtitle: String?, color: SKColor = Palette.warning) {
+        childNode(withName: "banner")?.removeFromParent()
+        let node = SKNode()
+        node.name = "banner"
+        node.zPosition = 60
+        node.position = CGPoint(x: size.width / 2, y: origin.y + cellSize * CGFloat(rows) * 0.6)
+        for (offset, tint) in [(CGPoint(x: 2, y: -2), SKColor.black.withAlphaComponent(0.6)), (CGPoint.zero, color)] {
+            let label = makeLabel(title, size: 32, font: Fonts.heavy, color: tint)
+            label.position = offset
+            node.addChild(label)
+        }
+        if let subtitle {
+            let detail = makeLabel(subtitle, size: 15, font: Fonts.heavy, color: Palette.text)
+            detail.position = CGPoint(x: 0, y: -30)
+            let backing = SKShapeNode(rectOf: CGSize(width: detail.frame.width + 20, height: 24), cornerRadius: 12)
+            backing.fillColor = Palette.bar.withAlphaComponent(0.75)
+            backing.strokeColor = .clear
+            backing.position = detail.position
+            node.addChild(backing)
+            node.addChild(detail)
+        }
+        let fit = min(1, (size.width - 24) / max(1, node.calculateAccumulatedFrame().width))
+        node.setScale(fit * 0.6)
+        node.alpha = 0
+        addChild(node)
+        node.run(.sequence([
+            .group([.fadeIn(withDuration: 0.15), .scale(to: fit * 1.05, duration: 0.15)]),
+            .scale(to: fit, duration: 0.1),
+            .wait(forDuration: 1.0),
+            .group([.fadeOut(withDuration: 0.35), .moveBy(x: 0, y: 24, duration: 0.35)]),
             .removeFromParent()
         ]))
     }

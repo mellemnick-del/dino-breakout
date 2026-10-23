@@ -139,6 +139,9 @@ final class Tower: SKNode {
     private(set) var level = 1
     private(set) var invested: Int
     var cooldown: TimeInterval = 0
+    /// Dinos this tower finished off, and the damage it's dealt, for its panel.
+    var kills = 0
+    var damageDealt: CGFloat = 0
     /// Which dino in range this tower shoots first.
     var targeting: Targeting = .first
     /// Seconds until the special ability is ready again.

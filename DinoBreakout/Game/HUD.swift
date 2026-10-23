@@ -72,6 +72,11 @@ final class HUD: SKNode {
     private let undoButton = SKShapeNode(rectOf: CGSize(width: 74, height: 20), cornerRadius: 7)
     private let undoLabel = makeLabel("↶ Undo", size: 12, font: Fonts.heavy)
     private let leftLabel = makeLabel("", size: 12, font: Fonts.heavy)
+    /// T-Rex health, across the top of the board while one is loose.
+    private let bossBar = SKNode()
+    private let bossFill = SKSpriteNode(color: Palette.danger, size: .zero)
+    private let bossLabel = makeLabel("", size: 10, font: Fonts.heavy)
+    private var bossWidth: CGFloat = 200
 
     init(size: CGSize, topHeight: CGFloat, bottomHeight: CGFloat, topInset: CGFloat, bottomInset: CGFloat) {
         super.init()
@@ -103,6 +108,22 @@ final class HUD: SKNode {
         leftLabel.position = CGPoint(x: size.width - 12, y: stripY)
         leftLabel.isHidden = true
         addChild(leftLabel)
+
+        bossWidth = min(size.width - 60, 320)
+        let bossHeight: CGFloat = 14
+        bossBar.position = CGPoint(x: size.width / 2, y: size.height - topHeight - bossHeight / 2 - 6)
+        bossBar.isHidden = true
+        let track = SKShapeNode(rectOf: CGSize(width: bossWidth + 4, height: bossHeight + 4), cornerRadius: 5)
+        track.fillColor = Palette.bar.withAlphaComponent(0.9)
+        track.strokeColor = Palette.danger.withAlphaComponent(0.8)
+        track.lineWidth = 1.5
+        bossBar.addChild(track)
+        bossFill.anchorPoint = CGPoint(x: 0, y: 0.5)
+        bossFill.size = CGSize(width: bossWidth, height: bossHeight)
+        bossFill.position = CGPoint(x: -bossWidth / 2, y: 0)
+        bossBar.addChild(bossFill)
+        bossBar.addChild(bossLabel)
+        addChild(bossBar)
         pauseButton.position = CGPoint(x: 28, y: midY)
         pauseButton.fillColor = Palette.panel
         pauseButton.strokeColor = SKColor(white: 1, alpha: 0.15)
@@ -310,6 +331,20 @@ final class HUD: SKNode {
             undoButton.isHidden = false
             undoButton.alpha = canUndo ? 1 : 0.4
             undoButton.strokeColor = canUndo ? Palette.warning.withAlphaComponent(0.7) : SKColor(white: 1, alpha: 0.25)
+        }
+    }
+
+    /// Pass nil when no T-Rex is on the board.
+    func setBoss(health fraction: CGFloat?, count: Int) {
+        guard let fraction else {
+            bossBar.isHidden = true
+            return
+        }
+        bossBar.isHidden = false
+        bossFill.size.width = bossWidth * min(1, max(0, fraction))
+        let text = count > 1 ? "T-REX ×\(count)" : "T-REX"
+        if bossLabel.text != text {
+            bossLabel.text = text
         }
     }
 
