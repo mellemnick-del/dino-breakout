@@ -22,7 +22,7 @@ Work top to bottom. Items marked **(done)** are already handled in the project.
 
 App Store Connect needs a public **Support URL** and **Privacy Policy URL**. The pages are ready in `docs/site` (home, support, privacy, and the icon).
 
-1. Replace `SUPPORT_EMAIL` in `docs/site/support.html` and `docs/site/privacy.html` with the email you want players to use.
+1. Support email (done): `nmellemapps@gmail.com` is on the support and privacy pages.
 2. Publish the folder. The free way:
    - On GitHub, create a new **public** repository named `dino-breakout-site` (the game repo stays private).
    - Upload the four files from `docs/site` (or ask Claude to push them once the repo exists).
