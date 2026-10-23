@@ -200,7 +200,6 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "DinoBreakout-Info.plist";
-				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Lets the optional reward ads be more relevant to you. The game plays the same either way.";
 				INFOPLIST_KEY_CFBundleDisplayName = "Dino Breakout";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -233,7 +232,6 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "DinoBreakout-Info.plist";
-				INFOPLIST_KEY_NSUserTrackingUsageDescription = "Lets the optional reward ads be more relevant to you. The game plays the same either way.";
 				INFOPLIST_KEY_CFBundleDisplayName = "Dino Breakout";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

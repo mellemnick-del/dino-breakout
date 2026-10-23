@@ -44,7 +44,7 @@ PLAY YOUR WAY
 - Speed up to 3x
 - 14 achievements and a Research Lab for permanent upgrades
 - Saves between waves, so you can pick up where you left off
-- No forced ads: watch one only if you want a revive or bonus cash
+- No ads
 - No account needed, plays offline
 
 ## Keywords (100 max, comma separated, no spaces needed)
@@ -58,23 +58,18 @@ dinosaur,dino,td,maze,strategy,raptor,trex,defense,offline,park,pterodactyl,surv
 
 ## Age rating
 
-Answer the questionnaire with **Infrequent/Mild Cartoon or Fantasy Violence** and **None** for everything else. That should come out at **9+**. In AdMob, set the app's maximum ad content rating to **PG** so ads match.
+Answer the questionnaire with **Infrequent/Mild Cartoon or Fantasy Violence** and **None** for everything else. That should come out at **9+**.
 
 ## App privacy
 
-The game itself collects nothing, but the optional rewarded ads come from Google AdMob, which does. Answer the App Privacy questions using Google's current guide ("Google Mobile Ads SDK: Apple App Store data disclosure", on developers.google.com/admob). At the time of writing that means declaring, for **Third-Party Advertising** and **Analytics**:
+Version 1.0 has no ads, so answer **Data Not Collected**. Game Center is Apple's service and doesn't change that. When the version 1.1 ads are added, update these answers using Google's guide ("Google Mobile Ads SDK: Apple App Store data disclosure", on developers.google.com/admob).
 
-- **Identifiers:** Device ID (used for tracking only if the player allows it in the iOS prompt)
-- **Location:** Coarse Location
-- **Usage Data:** Product Interaction, Advertising Data
-- **Diagnostics:** Crash Data, Performance Data, Other Diagnostic Data
-
-Game Center is Apple's service and doesn't change these answers.
+In the age rating questionnaire, answer **No** to "Does your app contain ads?"
 
 ## Also required
 
 - **Support URL:** any page with a way to contact you. A simple page on a free site is fine.
-- **Privacy policy URL:** the ready-made page in `docs/site/privacy.html`, which covers the optional AdMob ads.
+- **Privacy policy URL:** the ready-made page in `docs/site/privacy.html`.
 - **Copyright:** "2026" followed by your name or business name.
 
 ## Screenshots
