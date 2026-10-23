@@ -5,7 +5,7 @@ Work top to bottom. Items marked **(done)** are already handled in the project.
 ## 1. Project (done)
 
 - [x] App icon (paddock gate design, 1024 x 1024)
-- [x] Bundle ID `com.nickmellem.dinobreakout`, version **1.0.0**, build **3**
+- [x] Bundle ID `com.nickmellem.dinobreakout`, version **1.0.0**, build **5**
 - [x] Export compliance: no non-exempt encryption (`ITSAppUsesNonExemptEncryption = NO`), so App Store Connect won't ask
 - [x] Game Center capability on (`DinoBreakout.entitlements`)
 - [x] Test mode only exists in builds run from Xcode. TestFlight and App Store builds never have it (Apple rejects hidden features)
