@@ -83,6 +83,8 @@ final class GameScene: SKScene {
     private var endless: Bool
     /// Called when the player leaves for the main menu.
     var onExit: (() -> Void)?
+    /// App Store screenshot scene to stage (Xcode builds only), or 0 for a normal game.
+    var screenshot = 0
 
     // MARK: State
 
@@ -332,6 +334,11 @@ final class GameScene: SKScene {
             addChild(guide.node)
             tutorial = guide
         }
+        #if DEBUG
+        if screenshot > 0 {
+            stageScreenshot()
+        }
+        #endif
         world.alpha = 0
         world.run(.fadeIn(withDuration: 0.4))
         hud.alpha = 0
@@ -2318,6 +2325,72 @@ final class GameScene: SKScene {
     }
 
     /// Level 3 to 4: two cards, one for each way the tower can specialize.
+    #if DEBUG
+    // MARK: - App Store screenshots
+
+    /// Builds a serpentine maze lined with upgraded towers, then stages a scene:
+    /// 1 a mid-game wave, 2 a T-Rex boss wave, 3 a crowded wave with flyers,
+    /// 4 the upgrade path picker between waves.
+    private func stageScreenshot() {
+        tutorial?.node.removeFromParent()
+        tutorial = nil
+        let walls: [(row: Int, gapOnLeft: Bool)] = [(12, false), (9, true), (6, false), (3, true)]
+        let pattern: [BuildKind] = flyerHeavy
+            ? [.fence, .turret, .fence, .flak, .fence, .shock, .fence, .flak, .fence]
+            : [.fence, .turret, .fence, .tranq, .fence, .shock, .fence, .flare, .fence]
+        var picker: Tower?
+        for (i, wall) in walls.enumerated() {
+            for col in 0..<cols where col != (wall.gapOnLeft ? 0 : cols - 1) {
+                let kind = pattern[(col + i * 2) % pattern.count]
+                var level = kind == .fence ? 1 : 2 + (col + i) % 4
+                if screenshot == 4 && kind == .turret && picker == nil {
+                    level = 3
+                }
+                let branch = TowerBranch.options(for: kind).isEmpty ? nil : TowerBranch.options(for: kind)[(col + i) % 2]
+                let tower = placeForScreenshot(kind, at: Cell(col: col, row: wall.row), level: level, branch: branch)
+                if screenshot == 4 && kind == .turret && picker == nil {
+                    picker = tower
+                }
+            }
+        }
+        rebuildWires()
+        rebuildDarkness()
+        refreshBuildHints()
+        refreshPath()
+
+        let setups: [Int: (wave: Int, cash: Int, lives: Int)] = [
+            1: (9, 1385, 20), 2: (20, 2210, 17), 3: (22, 1890, 18), 4: (12, 640, 20)
+        ]
+        guard let setup = setups[screenshot] else { return }
+        wavesStarted = setup.wave - 1
+        cash = setup.cash
+        lives = setup.lives
+        hud.setWave(wavesStarted, of: waveGoal)
+        if screenshot == 4 {
+            updatePreview()
+            if let picker {
+                showBranchChoice(for: picker)
+            }
+        } else {
+            sendWave()
+        }
+    }
+
+    @discardableResult
+    private func placeForScreenshot(_ kind: BuildKind, at cell: Cell, level: Int, branch: TowerBranch?) -> Tower? {
+        guard !grid.terrain.contains(cell), cell != grid.spawn, cell != grid.exit, towers[cell] == nil,
+              grid.block(cell, keeping: []) else { return nil }
+        let tower = Tower(kind: kind, cell: cell, cellSize: cellSize)
+        tower.position = point(for: cell)
+        while tower.level < level, tower.upgradeCost != nil {
+            tower.upgrade(branch: branch)
+        }
+        world.addChild(tower)
+        towers[cell] = tower
+        return tower
+    }
+    #endif
+
     private func showBranchChoice(for tower: Tower) {
         guard let cost = tower.upgradeCost else { return }
         closePanel()

@@ -19,6 +19,8 @@ struct GameSession: Identifiable {
     var challenge: DailyChallenge?
     /// A saved run to pick back up.
     var resume: SavedGame?
+    /// Which App Store screenshot scene to stage (Xcode builds only), or 0.
+    var screenshot = 0
 }
 
 /// Shows the main menu, or a game once a park is picked.
@@ -55,10 +57,40 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             SoundBank.shared.start()
+            #if DEBUG
+            if stageScreenshot() {
+                return
+            }
+            #endif
             GameCenter.signIn()
             RewardedAds.shared.start()
         }
     }
+
+    #if DEBUG
+    /// App Store screenshot mode, used by the screenshots workflow. Launching
+    /// with `-shot N` jumps straight to a staged scene: 1 to 4 are games, 5 is
+    /// the menu with some progress. Returns true when a shot is being staged.
+    private func stageScreenshot() -> Bool {
+        let shot = UserDefaults.standard.integer(forKey: "shot")
+        guard shot > 0 else { return false }
+        UserDefaults.standard.set(true, forKey: Tutorial.doneKey)
+        SavedGame.clear()
+        let parks = ["paddock-b", "mount-ember", "aviary", "paddock-b"]
+        if shot <= parks.count, let level = Level.all.first(where: { $0.id == parks[shot - 1] }) {
+            session = GameSession(level: level, difficulty: .medium, screenshot: shot)
+        } else {
+            // The menu, with a few parks beaten so the stars and unlocks show
+            let bests = [("paddock-b", 50), ("raptor-ridge", 50), ("jungle-river", 31), ("visitor-center", 12)]
+            for (id, wave) in bests {
+                if let level = Level.all.first(where: { $0.id == id }) {
+                    Progress.record(wave: wave, level: level, difficulty: .medium)
+                }
+            }
+        }
+        return true
+    }
+    #endif
 }
 
 /// Hosts the SpriteKit game. The scene is created once, sized to the safe area.
@@ -95,6 +127,7 @@ struct GameView: View {
                     resume: session.resume
                 )
                 newScene.scaleMode = .aspectFit
+                newScene.screenshot = session.screenshot
                 newScene.onExit = onExit
                 scene = newScene
             }
