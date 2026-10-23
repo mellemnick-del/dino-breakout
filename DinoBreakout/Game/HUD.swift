@@ -39,6 +39,7 @@ enum HUDAction {
     case pick(Tool)
     case airstrike
     case undo
+    case adCash
 }
 
 /// One kind of dino in the next wave preview.
@@ -72,6 +73,9 @@ final class HUD: SKNode {
     private let undoButton = SKShapeNode(rectOf: CGSize(width: 74, height: 20), cornerRadius: 7)
     private let undoLabel = makeLabel("↶ Undo", size: 12, font: Fonts.heavy)
     private let leftLabel = makeLabel("", size: 12, font: Fonts.heavy)
+    /// "Watch: +$X", offered between waves every 5 waves when ads are available.
+    private let adButton = SKShapeNode(rectOf: CGSize(width: 96, height: 20), cornerRadius: 7)
+    private let adLabel = makeLabel("", size: 12, font: Fonts.heavy, color: Palette.bar)
     /// T-Rex health, across the top of the board while one is loose.
     private let bossBar = SKNode()
     private let bossFill = SKSpriteNode(color: Palette.danger, size: .zero)
@@ -97,7 +101,7 @@ final class HUD: SKNode {
         addChild(previewTitle)
         previewIcons.position = CGPoint(x: 72, y: stripY)
         addChild(previewIcons)
-        previewRoom = size.width - 72 - 12 - 74 - 10
+        previewRoom = size.width - 72 - 12 - 74 - 10 - 104
         undoButton.position = CGPoint(x: size.width - 12 - 37, y: stripY)
         undoButton.fillColor = Palette.bar
         undoButton.strokeColor = SKColor(white: 1, alpha: 0.25)
@@ -108,6 +112,12 @@ final class HUD: SKNode {
         leftLabel.position = CGPoint(x: size.width - 12, y: stripY)
         leftLabel.isHidden = true
         addChild(leftLabel)
+        adButton.position = CGPoint(x: size.width - 12 - 74 - 8 - 48, y: stripY)
+        adButton.fillColor = Palette.warning
+        adButton.lineWidth = 0
+        adButton.addChild(adLabel)
+        adButton.isHidden = true
+        addChild(adButton)
 
         bossWidth = min(size.width - 60, 320)
         let bossHeight: CGFloat = 14
@@ -341,6 +351,20 @@ final class HUD: SKNode {
         }
     }
 
+    /// Pass nil to hide the bonus cash ad offer.
+    func setAdOffer(cash: Int?) {
+        guard let cash else {
+            adButton.isHidden = true
+            return
+        }
+        adButton.isHidden = false
+        let text = "▶ Watch: +$\(cash)"
+        if adLabel.text != text {
+            adLabel.text = text
+            adLabel.setScale(min(1, 88 / max(1, adLabel.frame.width)))
+        }
+    }
+
     /// Pass nil when no T-Rex is on the board.
     func setBoss(health fraction: CGFloat?, count: Int) {
         guard let fraction else {
@@ -403,6 +427,9 @@ final class HUD: SKNode {
         }
         if strikeButton.contains(point) {
             return .airstrike
+        }
+        if !adButton.isHidden, adButton.frame.insetBy(dx: -4, dy: -4).contains(point) {
+            return .adCash
         }
         if !undoButton.isHidden, undoButton.frame.insetBy(dx: -6, dy: -4).contains(point) {
             return .undo

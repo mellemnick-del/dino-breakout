@@ -173,8 +173,28 @@ final class GameScene: SKScene {
         40 + 8 * max(1, wavesStarted)
     }
 
+    /// Offered between waves, every 5 waves, never in daily challenges.
     private var canWatchForCash: Bool {
-        RewardedAds.shared.isAvailable && challenge == nil && wavesStarted - lastAdBonusWave >= 5
+        RewardedAds.shared.isAvailable && challenge == nil && !waveActive && !isOver
+            && wavesStarted >= 5 && wavesStarted - lastAdBonusWave >= 5
+    }
+    /// The game over screen's double amber offer, once per game over.
+    private var amberDoubled = false
+
+    private func watchForCash() {
+        guard canWatchForCash else { return }
+        let bonus = adBonusCash
+        RewardedAds.shared.show(.bonusCash) { [weak self] in
+            guard let self else { return }
+            self.cash += bonus
+            self.lastAdBonusWave = self.wavesStarted
+            Haptics.success()
+            SoundBank.shared.play(.upgrade)
+            self.hud.flash("Thanks for watching! +$\(bonus)")
+            self.saveProgress()
+        } onUnavailable: { [weak self] in
+            self?.hud.flash("No ad ready yet. Try again in a moment")
+        }
     }
     /// One chopper strafing run per wave.
     private var airstrikeReady = true
@@ -599,10 +619,23 @@ final class GameScene: SKScene {
             if hits.contains("endless") {
                 keepGoing()
             } else if hits.contains("revive") {
-                RewardedAds.shared.show { [weak self] in
+                RewardedAds.shared.show(.revive) { [weak self] in
                     self?.revive()
                 } onUnavailable: { [weak overlay] in
                     (overlay?.childNode(withName: "//reviveLabel") as? SKLabelNode)?.text = "No ad ready, try again"
+                }
+            } else if hits.contains("amber"), !amberDoubled {
+                let bonus = amberThisRun
+                RewardedAds.shared.show(.doubleAmber) { [weak self, weak overlay] in
+                    guard let self else { return }
+                    self.amberDoubled = true
+                    Research.earn(bonus)
+                    self.amberThisRun += bonus
+                    Haptics.success()
+                    SoundBank.shared.play(.upgrade)
+                    (overlay?.childNode(withName: "//amberLabel") as? SKLabelNode)?.text = "Amber doubled! +\(Int(bonus)) more"
+                } onUnavailable: { [weak overlay] in
+                    (overlay?.childNode(withName: "//amberLabel") as? SKLabelNode)?.text = "No ad ready, try again"
                 }
             } else if hits.contains("restart") {
                 startNewGame()
@@ -619,18 +652,6 @@ final class GameScene: SKScene {
                 closePauseMenu()
             } else if hits.contains("menu") {
                 onExit?()
-            } else if hits.contains("adcash"), canWatchForCash {
-                let bonus = adBonusCash
-                RewardedAds.shared.show { [weak self] in
-                    guard let self else { return }
-                    self.cash += bonus
-                    self.lastAdBonusWave = self.wavesStarted
-                    Haptics.success()
-                    self.closePauseMenu()
-                    self.hud.flash("Thanks for watching! +$\(bonus)")
-                } onUnavailable: { [weak menu] in
-                    (menu?.childNode(withName: "//adcashLabel") as? SKLabelNode)?.text = "No ad ready, try again"
-                }
             }
             return
         }
@@ -707,6 +728,8 @@ final class GameScene: SKScene {
                 toggleAirstrike()
             case .undo:
                 undo()
+            case .adCash:
+                watchForCash()
             }
             return
         }
@@ -1385,6 +1408,7 @@ final class GameScene: SKScene {
         guard !isOver, pauseMenu == nil, dt > 0 else { return }
         stats.playTime += dt
         hud.setRemaining(waveActive ? spawnQueue.count + dinos.count : nil, canUndo: !undoSteps.isEmpty)
+        hud.setAdOffer(cash: canWatchForCash ? adBonusCash : nil)
         let rexes = dinos.filter { $0.kind == .rex && !$0.isDead }
         if rexes.isEmpty {
             hud.setBoss(health: nil, count: 0)
@@ -1805,6 +1829,16 @@ final class GameScene: SKScene {
                 overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80))
                 overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
             }
+        }
+        // Double the run's amber for an ad, under the other buttons
+        amberDoubled = false
+        if RewardedAds.shared.isAvailable && amberThisRun >= 1 {
+            let showsRevive = !won && RewardedAds.shared.isAvailable && !revivedThisGame && challenge == nil
+            let lowest: CGFloat = (won && challenge == nil) || showsRevive ? -200 : -140
+            let amber = menuButton("▶ Watch: double your \(Int(amberThisRun)) amber", name: "amber",
+                                   fill: Palette.panel, text: Palette.warning, outlined: true, y: lowest - 60)
+            amber.children.first?.name = "amberLabel"
+            overlay.addChild(amber)
         }
         gameOverOverlay = overlay
         SoundBank.shared.play(won ? .win : .lose)
@@ -2501,15 +2535,8 @@ final class GameScene: SKScene {
         menu.addChild(menuButton("Restart", name: "restart", fill: Palette.panel, text: Palette.danger, outlined: true, y: -50))
         menu.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -110))
 
-        var noteY: CGFloat = -156
-        if canWatchForCash {
-            let adButton = menuButton("▶ Watch an ad: +$\(adBonusCash)", name: "adcash", fill: Palette.panel, text: Palette.warning, outlined: true, y: -170)
-            adButton.children.first?.name = "adcashLabel"
-            menu.addChild(adButton)
-            noteY = -216
-        }
         let note = makeLabel("Restart and Main Menu end this run", size: 13, color: Palette.muted)
-        note.position = CGPoint(x: 0, y: noteY)
+        note.position = CGPoint(x: 0, y: -156)
         menu.addChild(note)
     }
 
