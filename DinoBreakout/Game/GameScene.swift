@@ -1820,7 +1820,7 @@ final class GameScene: SKScene {
             overlay.addChild(menuButton("Main Menu", name: "menu", fill: Palette.panel, text: Palette.text, outlined: true, y: -200))
         } else {
             if RewardedAds.shared.isAvailable && !revivedThisGame && challenge == nil {
-                let revive = menuButton("▶ Watch an ad to revive", name: "revive", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80)
+                let revive = menuButton("Watch an ad to revive", name: "revive", fill: Palette.warning, text: Palette.bar, outlined: false, y: -80)
                 revive.children.first?.name = "reviveLabel"
                 overlay.addChild(revive)
                 overlay.addChild(menuButton("Play Again", name: "restart", fill: Palette.panel, text: Palette.text, outlined: true, y: -140))
@@ -1835,7 +1835,7 @@ final class GameScene: SKScene {
         if RewardedAds.shared.isAvailable && amberThisRun >= 1 {
             let showsRevive = !won && RewardedAds.shared.isAvailable && !revivedThisGame && challenge == nil
             let lowest: CGFloat = (won && challenge == nil) || showsRevive ? -200 : -140
-            let amber = menuButton("▶ Watch: double your \(Int(amberThisRun)) amber", name: "amber",
+            let amber = menuButton("Watch an ad: double your \(Int(amberThisRun)) amber", name: "amber",
                                    fill: Palette.panel, text: Palette.warning, outlined: true, y: lowest - 60)
             amber.children.first?.name = "amberLabel"
             overlay.addChild(amber)

@@ -358,7 +358,7 @@ final class HUD: SKNode {
             return
         }
         adButton.isHidden = false
-        let text = "▶ Watch: +$\(cash)"
+        let text = "Watch ad: +$\(cash)"
         if adLabel.text != text {
             adLabel.text = text
             adLabel.setScale(min(1, 88 / max(1, adLabel.frame.width)))
