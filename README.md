@@ -156,14 +156,4 @@ The full listing (name, subtitle, description, keywords, category, age rating, p
 
 ## Roadmap
 
-Next up:
-- Pteranodons that fly over the maze (and an anti-air tower)
-- Raptors that test fences for weak spots, triceratops that smash through them
-- A generator that powers fences and turrets and has to be protected
-- Park zones as levels: visitor center, raptor pen, jungle river, aviary, lab, helipad
-- Flare tower lures dinos toward it
-
-Later:
-- Stars per level, saved progress, and an endless mode
-- Daily challenge map with a leaderboard (Game Center)
-- App icon and App Store listing
+Planned updates (translations, share cards, weekend events, new bosses, the Radio Operator hero, Park Builder, and more) are in `docs/Roadmap.md`.
