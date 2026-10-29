@@ -28,7 +28,7 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 ## How to play
 
 - Dinos break out of the **paddock gate** 🚧 at the top and run for the **helipad** 🚁 at the bottom.
-- Pick something from the build bar, then tap an empty square to place it.
+- Pick something from the build bar, then tap an empty square to place it. Tap the selected piece again to put it down, so stray taps don't build anything. Games start with nothing selected.
 - You can never fully block the path. Squares where a build would seal the dinos in are marked with a faint red X, and if you try one anyway it flashes red and says why right on the board (blocks the path, not enough cash, dino in the way, and so on). Build bar pieces you can't afford dim, with the price in red.
 - **Path preview:** a marching dotted line shows the route dinos will take from the gate, and it updates the moment you build, sell, or move anything.
 - **Next wave preview:** the strip under the top bar shows the next wave's dinos and how many of each. During a wave it shows how many dinos are left.
@@ -36,7 +36,8 @@ New parks are added in `Level.swift`: a gate square, a helipad square, and any b
 - **Undo:** between waves, the Undo button in that strip takes back your last build or upgrade for a full refund, all the way back to the end of the last wave.
 - **Move towers:** press on any tower or fence and drag it to a new square. The target square glows green if it's allowed and red if not, and towers show their range while you drag. Moving is free, and a moved tower takes a second to set up before it fires.
 - Tap any tower you built to open its panel: its level (1 of 5, also shown as rank chevrons; levels 4 and 5 add gold trim, and level 5 a gold star), an **Upgrade** button with the price, **Sell** for 70% back, and its range.
-- **Abilities:** every tower's panel has a special move that recharges (25 seconds, 30 for napalm): Tranq **Sleep Gas** nearly freezes everything close by for 3 seconds, Turret **Overdrive** fires three times as fast for 5 seconds, Flare **Napalm** leaves a burning patch that ignores armor, and Flak **Barrage** blasts every flyer in range.
+- **Abilities:** every tower's panel has a special move that recharges (25 seconds, 30 for napalm): Tranq **Sleep Gas** nearly freezes everything close by for 3 seconds, Turret **Overdrive** fires three times as fast for 5 seconds (and fires every charged turret at once: the button reads "Overdrive all"), Flare **Napalm** leaves a burning patch that ignores armor, and Flak **Barrage** blasts every flyer in range.
+- Tower panels go see-through during a wave, so you can still watch the dinos behind them.
 - **Aim:** towers that shoot have an Aim chip in their panel: First (closest to the helipad), Strongest, Closest, or Flyers.
 - **Air strike:** the last button in the build bar. Tap it, then tap the board, and the rescue chopper strafes that whole row. Once per wave.
 - **Boss bar:** while a T-Rex is loose, its health shows in a red bar across the top of the board.

@@ -320,7 +320,7 @@ final class GameScene: SKScene {
         endless = startedEndless
         hud.setWave(0, of: endless ? nil : waveGoal)
         hud.setSendEnabled(true)
-        tool = .build(.fence)
+        tool = nil
         hud.select(tool)
         burns = []
         stats = GameStats()
@@ -722,8 +722,14 @@ final class GameScene: SKScene {
                     sendWave()
                 }
             case .pick(let picked):
-                tool = picked
+                // Tapping the selected piece again puts it down, so stray taps don't build
+                tool = tool == picked ? nil : picked
                 hud.select(tool)
+                // Once per install, explain how to put a piece back down
+                if tool != nil && !UserDefaults.standard.bool(forKey: "deselectHintShown") {
+                    UserDefaults.standard.set(true, forKey: "deselectHintShown")
+                    hud.flash("Tap it again to put it down")
+                }
             case .airstrike:
                 toggleAirstrike()
             case .undo:
@@ -788,7 +794,7 @@ final class GameScene: SKScene {
             return
         }
         guard case .build(let kind)? = tool else {
-            hud.flash("Pick something to build")
+            hud.flash("Pick something from the build bar first")
             return
         }
         if let problem = siteProblem(at: cell) {
@@ -2057,14 +2063,22 @@ final class GameScene: SKScene {
         }
         tower.abilityCooldown = tower.kind.abilityRecharge
         Haptics.punch()
-        hud.flash("\(name)!")
+        if tower.kind != .turret {
+            hud.flash("\(name)!")
+        }
         tutorial?.handle(.upgraded)
         let reach = tower.range * cellSize
         switch tower.kind {
         case .tranq:
             sleepGas(at: tower.position, radius: reach * 1.2)
         case .turret:
-            tower.startOverdrive(for: 5)
+            // Overdrive fires every charged turret at once, not just this one
+            let charged = towers.values.filter { $0.kind == .turret && $0 !== tower && $0.abilityCooldown <= 0 }
+            for other in [tower] + charged {
+                other.abilityCooldown = other.kind.abilityRecharge
+                other.startOverdrive(for: 5)
+            }
+            hud.flash(charged.isEmpty ? "\(name)!" : "\(name) x\(charged.count + 1)!")
             SoundBank.shared.play(.turret)
         case .flare:
             napalm(at: tower.position, radius: reach * 1.1, damagePerSecond: tower.damage * 1.5)
@@ -2276,7 +2290,8 @@ final class GameScene: SKScene {
 
         let background = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 14)
         background.name = "panel"
-        background.fillColor = Palette.bar.withAlphaComponent(0.96)
+        // See-through during a wave, so the dinos behind it stay visible
+        background.fillColor = Palette.bar.withAlphaComponent(waveActive ? 0.45 : 0.96)
         background.strokeColor = Palette.warning.withAlphaComponent(0.55)
         background.lineWidth = 1.5
         panel.addChild(background)
@@ -2331,7 +2346,11 @@ final class GameScene: SKScene {
                                       x: width / 2 - 12 - 38, y: rowY, width: 76, height: 42, fontSize: 14))
             if let abilityName = tower.kind.abilityName {
                 let ready = tower.abilityCooldown <= 0
-                let abilityTitle = ready ? "⚡ \(abilityName)" : "\(abilityName)  ·  \(Int(tower.abilityCooldown.rounded(.up)))s"
+                let chargedTurrets = tower.kind == .turret
+                    ? towers.values.filter { $0.kind == .turret && $0.abilityCooldown <= 0 }.count
+                    : 0
+                let readyTitle = chargedTurrets > 1 ? "⚡ \(abilityName) all (\(chargedTurrets))" : "⚡ \(abilityName)"
+                let abilityTitle = ready ? readyTitle : "\(abilityName)  ·  \(Int(tower.abilityCooldown.rounded(.up)))s"
                 panel.addChild(menuButton(abilityTitle, name: "ability",
                                           fill: ready ? SKColor(red: 0.25, green: 0.53, blue: 0.79, alpha: 1) : Palette.panel,
                                           text: ready ? Palette.text : Palette.muted,
@@ -2436,7 +2455,7 @@ final class GameScene: SKScene {
 
         let background = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 14)
         background.name = "panel"
-        background.fillColor = Palette.bar.withAlphaComponent(0.97)
+        background.fillColor = Palette.bar.withAlphaComponent(waveActive ? 0.5 : 0.97)
         background.strokeColor = Palette.warning.withAlphaComponent(0.55)
         background.lineWidth = 1.5
         panel.addChild(background)
