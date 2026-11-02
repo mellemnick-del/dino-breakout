@@ -2507,6 +2507,12 @@ final class GameScene: SKScene {
             }
         } else {
             sendWave()
+            if screenshot == 9 {
+                // Keep the eggs in their nests long enough to photograph
+                for egg in dinos where egg.kind == .egg {
+                    egg.actionTimer = 60
+                }
+            }
         }
     }
 
