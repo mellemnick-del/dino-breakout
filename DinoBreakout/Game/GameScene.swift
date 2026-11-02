@@ -68,10 +68,10 @@ final class GameScene: SKScene {
     private let rows = Level.rows
     /// The game runs edge to edge. These insets keep the bars' buttons clear of
     /// the Dynamic Island and the home indicator.
-    private let topInset: CGFloat
-    private let bottomInset: CGFloat
-    private let topHeight: CGFloat
-    private let bottomHeight: CGFloat
+    private var topInset: CGFloat
+    private var bottomInset: CGFloat
+    private var topHeight: CGFloat
+    private var bottomHeight: CGFloat
 
     let level: Level
     let difficulty: Difficulty
@@ -270,6 +270,15 @@ final class GameScene: SKScene {
     /// keeping the game (towers, dinos, shots) exactly as it is.
     private func relayout(from oldSize: CGSize) {
         world.removeAction(forKey: "shake")
+        // Folding an iPhone Duo swaps screens, and each has its own edges
+        if let insets = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.keyWindow })
+            .first?.safeAreaInsets {
+            topInset = insets.top
+            bottomInset = insets.bottom * 0.5
+            topHeight = topInset + 50 + HUD.stripHeight
+            bottomHeight = bottomInset + 76
+        }
         let available = size.height - topHeight - bottomHeight
         let fit = floor(min(size.width / CGFloat(cols), available / CGFloat(rows)))
         let scale = fit / cellSize
