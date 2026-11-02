@@ -986,7 +986,7 @@ final class GameScene: SKScene {
             for col in 0..<cols {
                 let cell = Cell(col: col, row: row)
                 guard !grid.blocked.contains(cell), !grid.gates.contains(cell), cell != grid.exit, !occupied.contains(cell),
-                      !level.tar.contains(cell), !level.nests.contains(cell),
+                      !self.level.tar.contains(cell), !self.level.nests.contains(cell),
                       !grid.canBlock(cell, keeping: walkers, keepingSwimmers: swimmers) else { continue }
                 let mark = SKSpriteNode(texture: hintTexture, size: CGSize(width: cellSize, height: cellSize))
                 mark.position = point(for: cell)
@@ -2512,7 +2512,7 @@ final class GameScene: SKScene {
     @discardableResult
     private func placeForScreenshot(_ kind: BuildKind, at cell: Cell, level: Int, branch: TowerBranch?) -> Tower? {
         guard !grid.terrain.contains(cell), !grid.gates.contains(cell), cell != grid.exit, towers[cell] == nil,
-              !level.tar.contains(cell), !level.nests.contains(cell),
+              !self.level.tar.contains(cell), !self.level.nests.contains(cell),
               grid.block(cell, keeping: []) else { return nil }
         let tower = Tower(kind: kind, cell: cell, cellSize: cellSize)
         tower.position = point(for: cell)
