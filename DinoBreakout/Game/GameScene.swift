@@ -2471,7 +2471,8 @@ final class GameScene: SKScene {
             ? [.fence, .turret, .fence, .flak, .fence, .shock, .fence, .flak, .fence]
             : [.fence, .turret, .fence, .tranq, .fence, .shock, .fence, .flare, .fence]
         var picker: Tower?
-        for (i, wall) in walls.enumerated() {
+        // Scene 9 is an empty Hatchery, to show eggs before anything breaks them
+        for (i, wall) in walls.enumerated() where screenshot != 9 {
             for col in 0..<cols where col != (wall.gapOnLeft ? 0 : cols - 1) {
                 let kind = pattern[(col + i * 2) % pattern.count]
                 var level = kind == .fence ? 1 : 2 + (col + i) % 4
@@ -2492,7 +2493,7 @@ final class GameScene: SKScene {
 
         let setups: [Int: (wave: Int, cash: Int, lives: Int)] = [
             1: (9, 1385, 20), 2: (20, 2210, 17), 3: (22, 1890, 18), 4: (12, 640, 20),
-            6: (9, 1120, 20), 7: (12, 980, 19), 8: (11, 1340, 18)
+            6: (9, 1120, 20), 7: (12, 980, 19), 8: (11, 1340, 18), 9: (12, 500, 20)
         ]
         guard let setup = setups[screenshot] else { return }
         wavesStarted = setup.wave - 1
