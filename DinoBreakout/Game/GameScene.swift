@@ -161,6 +161,10 @@ final class GameScene: SKScene {
     private var darkness: SKSpriteNode?
     /// Whether this game has explained venom yet.
     private var warnedAboutSpit = false
+    /// Which gate the next dino breaks out of, on parks with two.
+    private var nextGate = 0
+    /// Whether this game has explained eggs yet.
+    private var warnedAboutEggs = false
     /// Whether this game has explained ankylosaurs and pachys yet.
     private var warnedAboutSmash = false
     private var warnedAboutHeadbutt = false
@@ -327,6 +331,8 @@ final class GameScene: SKScene {
         warnedAboutSpit = false
         warnedAboutSmash = false
         warnedAboutHeadbutt = false
+        warnedAboutEggs = false
+        nextGate = 0
         revivedThisGame = false
         lastAdBonusWave = -99
         airstrikeReady = true
@@ -394,7 +400,9 @@ final class GameScene: SKScene {
 
         buildTerrain()
         rebuildDarkness()
-        buildGate()
+        for gate in grid.gates {
+            buildGate(at: gate)
+        }
         buildHelipad()
     }
 
@@ -430,6 +438,21 @@ final class GameScene: SKScene {
             roof.zPosition = 2
             world.addChild(roof)
         }
+        let tarFrames = (0..<2).map { ParkArt.tar(cell: cellSize, frame: $0) }
+        for cell in level.tar {
+            let pit = SKSpriteNode(texture: tarFrames[0], size: CGSize(width: cellSize, height: cellSize))
+            pit.position = point(for: cell)
+            pit.zPosition = 0.4
+            let pace = 0.6 + Double(ParkArt.hash(CGFloat(cell.col), CGFloat(cell.row))) * 0.4
+            pit.run(.repeatForever(.animate(with: tarFrames, timePerFrame: pace)))
+            world.addChild(pit)
+        }
+        for cell in level.nests {
+            let nest = SKSpriteNode(texture: ParkArt.nest(cell: cellSize), size: CGSize(width: cellSize, height: cellSize))
+            nest.position = point(for: cell)
+            nest.zPosition = 0.4
+            world.addChild(nest)
+        }
         for cell in level.rocks {
             let variant = Int(ParkArt.hash(CGFloat(cell.col) + 3, CGFloat(cell.row)) * 3)
             let rock = SKSpriteNode(texture: ParkArt.boulder(cell: cellSize, variant: variant), size: square)
@@ -440,9 +463,9 @@ final class GameScene: SKScene {
     }
 
     /// Steel paddock gate on the spawn square. Doors swing open while a wave is on.
-    private func buildGate() {
+    private func buildGate(at cell: Cell) {
         let gate = SKNode()
-        gate.position = point(for: grid.spawn)
+        gate.position = point(for: cell)
         gate.zPosition = 2
         world.addChild(gate)
         let c = cellSize
@@ -569,7 +592,7 @@ final class GameScene: SKScene {
 
     /// Dinos wear a dirt trail into the grass as they run the maze.
     private func addWear(at cell: Cell) {
-        guard cell != grid.spawn, cell != grid.exit, !grid.water.contains(cell) else { return }
+        guard !grid.gates.contains(cell), cell != grid.exit, !grid.water.contains(cell) else { return }
         let count = (wear[cell] ?? 0) + 1
         wear[cell] = count
         let patch: SKSpriteNode
@@ -862,8 +885,14 @@ final class GameScene: SKScene {
             }
             return ("Boulder", "Can't build on a boulder")
         }
-        if cell == grid.spawn || cell == grid.exit {
+        if grid.gates.contains(cell) || cell == grid.exit {
             return ("Keep clear", "The gate and the helipad have to stay open")
+        }
+        if level.tar.contains(cell) {
+            return ("Tar", "Can't build in the tar pit")
+        }
+        if level.nests.contains(cell) {
+            return ("Nest", "Can't build on a nest")
         }
         let (walkers, swimmers) = dinoCells()
         if (walkers + swimmers).contains(cell) {
@@ -956,7 +985,8 @@ final class GameScene: SKScene {
         for row in 0..<rows {
             for col in 0..<cols {
                 let cell = Cell(col: col, row: row)
-                guard !grid.blocked.contains(cell), cell != grid.spawn, cell != grid.exit, !occupied.contains(cell),
+                guard !grid.blocked.contains(cell), !grid.gates.contains(cell), cell != grid.exit, !occupied.contains(cell),
+                      !level.tar.contains(cell), !level.nests.contains(cell),
                       !grid.canBlock(cell, keeping: walkers, keepingSwimmers: swimmers) else { continue }
                 let mark = SKSpriteNode(texture: hintTexture, size: CGSize(width: cellSize, height: cellSize))
                 mark.position = point(for: cell)
@@ -977,35 +1007,37 @@ final class GameScene: SKScene {
                 context.cgContext.fillEllipse(in: CGRect(x: 0, y: 0, width: side, height: side))
             })
         }
-        var route = [grid.spawn]
-        var here = grid.spawn
-        while let next = grid.nextStep(from: here), route.count <= cols * rows {
-            route.append(next)
-            here = next
-        }
         let dotSize = pathDot?.size() ?? .zero
         let period: TimeInterval = 1.2
-        var index = 0
-        for (a, b) in zip(route, route.dropFirst()) {
-            let from = point(for: a)
-            let to = point(for: b)
-            for step in 0..<3 where !(a == grid.spawn && step == 0) {
-                let f = CGFloat(step) / 3
-                let dot = SKSpriteNode(texture: pathDot, size: dotSize)
-                dot.position = CGPoint(x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f)
-                dot.alpha = 0.25
-                // Each dot lights a moment after the one before, so the line marches toward the helipad
-                let delay = (Double(index) * 0.05).truncatingRemainder(dividingBy: period)
-                dot.run(.sequence([
-                    .wait(forDuration: delay),
-                    .repeatForever(.sequence([
-                        .fadeAlpha(to: 0.9, duration: 0.15),
-                        .fadeAlpha(to: 0.25, duration: 0.45),
-                        .wait(forDuration: period - 0.6)
+        for gate in grid.gates {
+            var route = [gate]
+            var here = gate
+            while let next = grid.nextStep(from: here), route.count <= cols * rows {
+                route.append(next)
+                here = next
+            }
+            var index = 0
+            for (a, b) in zip(route, route.dropFirst()) {
+                let from = point(for: a)
+                let to = point(for: b)
+                for step in 0..<3 where !(a == gate && step == 0) {
+                    let f = CGFloat(step) / 3
+                    let dot = SKSpriteNode(texture: pathDot, size: dotSize)
+                    dot.position = CGPoint(x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f)
+                    dot.alpha = 0.25
+                    // Each dot lights a moment after the one before, so the line marches toward the helipad
+                    let delay = (Double(index) * 0.05).truncatingRemainder(dividingBy: period)
+                    dot.run(.sequence([
+                        .wait(forDuration: delay),
+                        .repeatForever(.sequence([
+                            .fadeAlpha(to: 0.9, duration: 0.15),
+                            .fadeAlpha(to: 0.25, duration: 0.45),
+                            .wait(forDuration: period - 0.6)
+                        ]))
                     ]))
-                ]))
-                pathLayer.addChild(dot)
-                index += 1
+                    pathLayer.addChild(dot)
+                    index += 1
+                }
             }
         }
         pathLayer.alpha = waveActive ? 0.5 : 1
@@ -1272,6 +1304,7 @@ final class GameScene: SKScene {
         spawnQueue = Waves.schedule(wave)
         waveClock = 0
         waveActive = true
+        layEggs()
         undoSteps = []
         pathLayer.alpha = 0.5
         updatePreview()
@@ -1308,16 +1341,24 @@ final class GameScene: SKScene {
         }
     }
 
-    private func spawn(_ kind: DinoKind) {
+    private func spawn(_ kind: DinoKind, at cell: Cell? = nil) {
+        // Twin Gates: dinos take turns breaking out of each gate
+        let start: Cell
+        if let cell {
+            start = cell
+        } else {
+            start = grid.gates[nextGate % grid.gates.count]
+            nextGate += 1
+        }
         let dino = Dino(
             kind: kind,
             healthScale: Waves.healthScale(forWave: wavesStarted - 1) * difficulty.health * (challenge?.healthScale ?? 1),
-            cell: grid.spawn,
+            cell: start,
             cellSize: cellSize,
             screenScale: screenScale
         )
-        dino.target = grid.nextStep(from: grid.spawn, swims: kind.swims) ?? grid.spawn
-        dino.position = point(for: grid.spawn)
+        dino.target = kind == .egg ? start : (grid.nextStep(from: start, swims: kind.swims) ?? start)
+        dino.position = point(for: start)
         // Late waves move a little faster, so a long maze buys less time
         let lateWaveSpeed = 1 + 0.004 * CGFloat(min(max(wavesStarted - 1, 0), 60))
         dino.speedScale = (challenge?.speedScale ?? 1) * lateWaveSpeed
@@ -1328,7 +1369,7 @@ final class GameScene: SKScene {
         dinos.append(dino)
 
         if kind.flies {
-            dino.flight = Flight(start: point(for: grid.spawn), end: point(for: grid.exit), weave: Bool.random() ? 1 : -1)
+            dino.flight = Flight(start: point(for: start), end: point(for: grid.exit), weave: Bool.random() ? 1 : -1)
             SoundBank.shared.play(.screech)
             if !warnedAboutFlyers {
                 warnedAboutFlyers = true
@@ -1455,7 +1496,9 @@ final class GameScene: SKScene {
                 }
                 continue
             }
-            var budget = dino.currentSpeed * cellSize * CGFloat(dt)
+            // Tar pits: wading dinos crawl
+            let inTar = level.tar.contains(dino.cell) || level.tar.contains(dino.target)
+            var budget = dino.currentSpeed * cellSize * CGFloat(dt) * (inTar ? 0.45 : 1)
             while budget > 0 {
                 let dest = point(for: dino.target)
                 let dx = dest.x - dino.position.x
@@ -1565,7 +1608,8 @@ final class GameScene: SKScene {
                 pulse(from: tower, radius: reach)
                 SoundBank.shared.play(.flare)
                 for dino in inRange {
-                    hit(dino, for: tower.damage, armorApplies: !tower.ignoresArmor, source: .flare, by: tower)
+                    let tarBonus: CGFloat = level.tar.contains(dino.cell) ? 1.5 : 1
+                    hit(dino, for: tower.damage * tarBonus, armorApplies: !tower.ignoresArmor, source: .flare, by: tower)
                 }
             } else if let target = pickTarget(from: inRange, for: tower) {
                 if tower.kind == .shock {
@@ -1907,6 +1951,11 @@ final class GameScene: SKScene {
                 } else {
                     dino.actionTimer = 0.5
                 }
+            } else if dino.kind == .egg {
+                dino.actionTimer -= dt
+                if dino.actionTimer <= 0 {
+                    hatch(dino)
+                }
             } else if dino.kind.headbutts {
                 dino.chargeLeft = max(0, dino.chargeLeft - dt)
                 dino.headbuttCooldown = max(0, dino.headbuttCooldown - dt)
@@ -1930,6 +1979,38 @@ final class GameScene: SKScene {
                 }
             }
         }
+    }
+
+    /// The Hatchery: each wave from 3 on, eggs appear in some nests. They hatch
+    /// partway through the wave unless your towers break them first.
+    private func layEggs() {
+        guard !level.nests.isEmpty, wavesStarted >= 3 else { return }
+        let count = min(level.nests.count, 1 + wavesStarted / 8)
+        for nest in level.nests.shuffled().prefix(count) {
+            spawn(.egg, at: nest)
+            dinos.last?.actionTimer = 9
+        }
+        if !warnedAboutEggs {
+            warnedAboutEggs = true
+            hud.flash("Eggs in the nests! Break them before they hatch")
+        }
+    }
+
+    private func hatch(_ egg: Dino) {
+        guard !egg.isDead, let index = dinos.firstIndex(where: { $0 === egg }) else { return }
+        dinos.remove(at: index)
+        puff(at: egg.position, color: UIColor(hex: 0xEDE3C8))
+        SoundBank.shared.play(.screech, volume: 0.6)
+        egg.run(.sequence([.fadeOut(withDuration: 0.15), .removeFromParent()]))
+        // Later waves hatch raptors as well as compies
+        var brood: [DinoKind] = [.compy, .compy, .compy]
+        if wavesStarted >= 15 {
+            brood += [.raptor, .raptor]
+        }
+        for kind in brood {
+            spawn(kind, at: egg.cell)
+        }
+        hud.flash("An egg hatched inside your maze!")
     }
 
     /// An ankylosaur's tail club knocks a fence flat, opening a gap in the maze.
@@ -1958,10 +2039,8 @@ final class GameScene: SKScene {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = false
-        var lights: [(CGPoint, CGFloat)] = [
-            (point(for: grid.spawn), cellSize * 1.4),
-            (point(for: grid.exit), cellSize * 1.8)
-        ]
+        var lights: [(CGPoint, CGFloat)] = grid.gates.map { (point(for: $0), cellSize * 1.4) }
+        lights.append((point(for: grid.exit), cellSize * 1.8))
         for tower in towers.values {
             lights.append((tower.position, cellSize * (tower.kind == .fence ? 0.7 : 1.9)))
         }
@@ -2431,7 +2510,8 @@ final class GameScene: SKScene {
 
     @discardableResult
     private func placeForScreenshot(_ kind: BuildKind, at cell: Cell, level: Int, branch: TowerBranch?) -> Tower? {
-        guard !grid.terrain.contains(cell), cell != grid.spawn, cell != grid.exit, towers[cell] == nil,
+        guard !grid.terrain.contains(cell), !grid.gates.contains(cell), cell != grid.exit, towers[cell] == nil,
+              !level.tar.contains(cell), !level.nests.contains(cell),
               grid.block(cell, keeping: []) else { return nil }
         let tower = Tower(kind: kind, cell: cell, cellSize: cellSize)
         tower.position = point(for: cell)

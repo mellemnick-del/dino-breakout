@@ -29,6 +29,17 @@ struct Level: Identifiable, Hashable {
     var flyerHeavy = false
     /// Dark: you only see what your towers light up.
     var night = false
+    /// A second paddock gate. Dinos take turns breaking out of each.
+    var gate2: Cell?
+    /// Tar pits. Dinos can wade through but crawl, and flares burn them harder. No building.
+    var tar: [Cell] = []
+    /// Egg nests. Each wave some fill with eggs that hatch into dinos unless destroyed. No building.
+    var nests: [Cell] = []
+
+    /// Every gate dinos break out of.
+    var gates: [Cell] {
+        [spawn] + (gate2.map { [$0] } ?? [])
+    }
 
     var terrain: Set<Cell> {
         Set(rocks + water + lava + buildings)
@@ -105,7 +116,7 @@ struct Level: Identifiable, Hashable {
         Level(
             id: "mount-ember",
             name: "Mount Ember",
-            blurb: "Lava pools on the slopes of a waking volcano. The hardest park.",
+            blurb: "Lava pools on the slopes of a waking volcano.",
             spawn: Cell(col: 4, row: 14),
             exit: Cell(col: 4, row: 0),
             lava: [
@@ -114,8 +125,46 @@ struct Level: Identifiable, Hashable {
                 Cell(col: 0, row: 4), Cell(col: 1, row: 4), Cell(col: 7, row: 4), Cell(col: 8, row: 4)
             ],
             ash: true
+        ),
+        Level(
+            id: "tar-pits",
+            name: "Tar Pits",
+            blurb: "Dinos crawl through sticky tar, and flares burn them hotter there. Steer them in.",
+            spawn: Cell(col: 4, row: 14),
+            exit: Cell(col: 4, row: 0),
+            rocks: [Cell(col: 4, row: 10), Cell(col: 0, row: 7), Cell(col: 8, row: 6)],
+            tar: [
+                Cell(col: 1, row: 12), Cell(col: 2, row: 12), Cell(col: 1, row: 11), Cell(col: 2, row: 11),
+                Cell(col: 5, row: 8), Cell(col: 6, row: 8), Cell(col: 7, row: 8),
+                Cell(col: 1, row: 5), Cell(col: 2, row: 5), Cell(col: 3, row: 5),
+                Cell(col: 6, row: 3), Cell(col: 7, row: 3), Cell(col: 6, row: 2)
+            ]
+        ),
+        Level(
+            id: "hatchery",
+            name: "The Hatchery",
+            blurb: "Eggs appear in the nests each wave. Shoot them before they hatch inside your maze.",
+            spawn: Cell(col: 0, row: 14),
+            exit: Cell(col: 8, row: 0),
+            rocks: [Cell(col: 4, row: 11), Cell(col: 1, row: 6), Cell(col: 6, row: 4)],
+            nests: [Cell(col: 6, row: 12), Cell(col: 2, row: 9), Cell(col: 7, row: 7), Cell(col: 3, row: 5), Cell(col: 5, row: 2)]
+        ),
+        Level(
+            id: "twin-gates",
+            name: "Twin Gates",
+            blurb: "Two paddock gates break open at once. One maze, two entrances. The hardest park.",
+            spawn: Cell(col: 1, row: 14),
+            exit: Cell(col: 4, row: 0),
+            rocks: [Cell(col: 4, row: 12), Cell(col: 4, row: 11), Cell(col: 2, row: 7), Cell(col: 6, row: 7), Cell(col: 4, row: 4)],
+            gate2: Cell(col: 7, row: 14)
         )
     ]
+
+    /// The parks the daily challenge picks from. Fixed, so players on every
+    /// version of the game get the same challenge each day.
+    static var dailyPool: [Level] {
+        Array(all.prefix(7))
+    }
 }
 
 enum Difficulty: String, CaseIterable, Identifiable {

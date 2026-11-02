@@ -63,6 +63,9 @@ In the app's page in App Store Connect: Services (or Features), Game Center, the
 | Endless: The Aviary | `endless.aviary` |
 | Endless: Night Shift | `endless.night-shift` |
 | Endless: Mount Ember | `endless.mount-ember` |
+| Endless: Tar Pits | `endless.tar-pits` |
+| Endless: The Hatchery | `endless.hatchery` |
+| Endless: Twin Gates | `endless.twin-gates` |
 | Daily challenge | `daily.waves` |
 
 Also create **Achievements** (same Game Center page, Achievements, +). For each one: the reference name and ID below, **Achievable more than once: No**, points of your choice (all 14 must add up to 1,000 or less, so 50 each works), and a title, description, and 512 x 512 image. The game reports them automatically once they exist.

@@ -3,6 +3,8 @@ import SpriteKit
 enum DinoKind {
     case compy, raptor, dilophosaurus, triceratops, stegosaurus, spinosaurus, rex, pterodactyl
     case ankylosaurus, pachycephalosaurus
+    /// Laid in Hatchery nests. Doesn't move; hatches into dinos unless destroyed.
+    case egg
 
     static let all: [DinoKind] = [
         .compy, .raptor, .dilophosaurus, .triceratops, .stegosaurus, .spinosaurus, .rex, .pterodactyl,
@@ -21,6 +23,7 @@ enum DinoKind {
         case .pterodactyl: "Pterodactyl"
         case .ankylosaurus: "Ankylosaurus"
         case .pachycephalosaurus: "Pachycephalosaurus"
+        case .egg: "Dino egg"
         }
     }
 
@@ -70,6 +73,7 @@ enum DinoKind {
         case .pterodactyl: "pterodactyls"
         case .ankylosaurus: "ankylosaurs"
         case .pachycephalosaurus: "pachys"
+        case .egg: "eggs"
         }
     }
 
@@ -85,6 +89,7 @@ enum DinoKind {
         case .pterodactyl: 40
         case .ankylosaurus: 280
         case .pachycephalosaurus: 110
+        case .egg: 70
         }
     }
 
@@ -101,6 +106,7 @@ enum DinoKind {
         case .pterodactyl: 1.3
         case .ankylosaurus: 0.7
         case .pachycephalosaurus: 1.3
+        case .egg: 0
         }
     }
 
@@ -117,6 +123,7 @@ enum DinoKind {
         case .pterodactyl: 5
         case .ankylosaurus: 16
         case .pachycephalosaurus: 9
+        case .egg: 3
         }
     }
 
@@ -133,6 +140,7 @@ enum DinoKind {
         case .pterodactyl: 1
         case .ankylosaurus: 2
         case .pachycephalosaurus: 1
+        case .egg: 0
         }
     }
 }
@@ -230,6 +238,17 @@ final class Dino: SKNode {
         addChild(bar)
 
         // Walk cycle, starting at a random step so a pack doesn't march in lockstep
+        if kind == .egg {
+            // A speckled egg instead of a walking dino
+            art.texture = ParkArt.egg(cell: cellSize)
+            art.size = CGSize(width: cellSize * 0.5, height: cellSize * 0.5)
+            art.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            art.zRotation = 0
+            art.run(.repeatForever(.sequence([
+                .rotate(toAngle: 0.12, duration: 0.25), .rotate(toAngle: -0.12, duration: 0.25)
+            ])))
+            return
+        }
         let frames = baked.frames
         let start = Int.random(in: 0..<frames.count)
         let cycle = Array(frames[start...] + frames[..<start])
@@ -265,6 +284,7 @@ final class Dino: SKNode {
 
     /// Turns smoothly toward the direction it's walking.
     func steer(toward angle: CGFloat, dt: TimeInterval) {
+        guard kind != .egg else { return }
         var diff = angle - heading
         while diff > .pi { diff -= 2 * .pi }
         while diff < -.pi { diff += 2 * .pi }

@@ -97,7 +97,7 @@ struct DinoStyle {
 extension DinoKind {
     var style: DinoStyle {
         switch self {
-        case .compy:
+        case .compy, .egg:
             DinoStyle(
                 skin: UIColor(hex: 0x7FA33A), light: UIColor(hex: 0xB2D062), dark: UIColor(hex: 0x3C561A), eye: UIColor(hex: 0x1A1A10),
                 spine: [(0, 9), (-4, 13), (-11, 17), (-18, 16), (-24, 11), (-32, 7), (-40, 4), (-48, 2), (-53, 0.8)],

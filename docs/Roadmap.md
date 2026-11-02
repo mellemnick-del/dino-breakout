@@ -7,12 +7,14 @@ Everything in the README: 7 parks, 6 towers with branching upgrades, 10 dinos, e
 
 ## 1.1: optional ads (built, on the `version-1.1` branch)
 - Rewarded ads only: revive, bonus cash between waves (every 5 waves), double amber at game over
-- Fixes and balance from TestFlight feedback
+- Tester feedback: overdrive all turrets at once, see-through panels mid-wave, tap a build button again to deselect
+- Three new parks: Tar Pits, The Hatchery, Twin Gates
 - Ships after 1.0 is approved. See `docs/ReleaseChecklist.md`, "Version 1.1: rewarded ads"
 
 ## 1.2: growth (cheap wins)
 - **Translations:** Spanish, Portuguese, German, French, Japanese. Game text plus the App Store listing in each language.
 - **Shareable result cards:** a Share button at game over that makes an image of your actual maze, the park, the wave you reached, and the difficulty.
+- **Tidal Lagoon park:** the tide floods the lowest rows every few waves, shutting off towers there.
 - **Weekend events:** limited-time rule sets built on the daily challenge system, like "Raptor Rampage weekend: raptors only, double amber."
 
 ## 1.3: the big content update

@@ -59,7 +59,7 @@ struct DailyChallenge: Hashable {
         let difficulties: [Difficulty] = [.easy, .medium, .medium, .hard]
         return DailyChallenge(
             dateKey: key,
-            level: Level.all[next(Level.all.count)],
+            level: Level.dailyPool[next(Level.dailyPool.count)],
             difficulty: difficulties[next(difficulties.count)],
             twist: Twist.allCases[next(Twist.allCases.count)]
         )

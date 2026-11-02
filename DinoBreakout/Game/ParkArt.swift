@@ -345,6 +345,71 @@ enum ParkArt {
 
     // MARK: Terrain
 
+    /// A glossy black tar pit with a few bubbles. Two frames so it seems to simmer.
+    static func tar(cell c: CGFloat, frame: Int) -> SKTexture {
+        texture("tar-\(frame)-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
+            let r = c * 0.47
+            ctx.addEllipse(in: CGRect(x: -r, y: -r * 0.92, width: r * 2, height: r * 1.84))
+            fill(ctx, UIColor(hex: 0x16120F))
+            ctx.addEllipse(in: CGRect(x: -r * 0.8, y: -r * 0.72, width: r * 1.6, height: r * 1.44))
+            fill(ctx, UIColor(hex: 0x241D18))
+            ctx.addEllipse(in: CGRect(x: -r * 0.5, y: r * 0.15, width: r * 0.7, height: r * 0.28))
+            fill(ctx, UIColor(white: 1, alpha: 0.12))
+            for i in 0..<3 {
+                let fi = CGFloat(i + frame * 3)
+                let x = (hash(fi, 4) - 0.5) * c * 0.55
+                let y = (hash(7, fi) - 0.5) * c * 0.5
+                let b = c * (0.035 + hash(fi, fi) * 0.04)
+                ctx.addEllipse(in: CGRect(x: x - b, y: y - b, width: b * 2, height: b * 2))
+                ctx.setStrokeColor(UIColor(white: 1, alpha: 0.18).cgColor)
+                ctx.setLineWidth(max(1, c * 0.015))
+                ctx.strokePath()
+            }
+        }
+    }
+
+    /// A ring of straw on the ground where eggs appear.
+    static func nest(cell c: CGFloat) -> SKTexture {
+        texture("nest-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in
+            let r = c * 0.36
+            ctx.addEllipse(in: CGRect(x: -r, y: -r * 0.85, width: r * 2, height: r * 1.7))
+            fill(ctx, UIColor(hex: 0x6B5228))
+            ctx.addEllipse(in: CGRect(x: -r * 0.62, y: -r * 0.5, width: r * 1.24, height: r * 1.0))
+            fill(ctx, UIColor(hex: 0x3E2F17))
+            ctx.setStrokeColor(UIColor(hex: 0xC9A35A).cgColor)
+            ctx.setLineWidth(max(1, c * 0.02))
+            for i in 0..<14 {
+                let a = CGFloat(i) / 14 * .pi * 2
+                let inner = CGPoint(x: cos(a) * r * 0.62, y: sin(a) * r * 0.5)
+                let outer = CGPoint(x: cos(a + 0.3) * r * 1.02, y: sin(a + 0.3) * r * 0.87)
+                ctx.move(to: inner)
+                ctx.addLine(to: outer)
+            }
+            ctx.strokePath()
+        }
+    }
+
+    /// A speckled dino egg.
+    static func egg(cell c: CGFloat) -> SKTexture {
+        let side = c * 0.5
+        return texture("egg-\(Int(c))", size: CGSize(width: side, height: side)) { ctx in
+            let w = side * 0.62
+            let h = side * 0.82
+            ctx.addEllipse(in: CGRect(x: -w / 2, y: -h / 2, width: w, height: h))
+            ink(ctx, UIColor(hex: 0xEDE3C8), lineWidth(c))
+            for i in 0..<6 {
+                let fi = CGFloat(i)
+                let x = (hash(fi, 2) - 0.5) * w * 0.7
+                let y = (hash(3, fi) - 0.5) * h * 0.7
+                let s = side * 0.05
+                ctx.addEllipse(in: CGRect(x: x - s, y: y - s, width: s * 2, height: s * 2))
+                fill(ctx, UIColor(hex: 0x7B9B4A))
+            }
+            ctx.addEllipse(in: CGRect(x: -w * 0.28, y: h * 0.05, width: w * 0.22, height: h * 0.25))
+            fill(ctx, UIColor(white: 1, alpha: 0.5))
+        }
+    }
+
     /// A mossy boulder filling a square. Three shapes.
     static func boulder(cell c: CGFloat, variant: Int) -> SKTexture {
         texture("boulder-\(variant)-\(Int(c))", size: CGSize(width: c, height: c)) { ctx in

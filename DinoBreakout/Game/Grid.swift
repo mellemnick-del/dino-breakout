@@ -13,8 +13,10 @@ final class Grid {
 
     let cols: Int
     let rows: Int
-    /// Paddock gate, where dinos break out.
+    /// Paddock gate, where dinos break out (the first one, when there are two).
     let spawn: Cell
+    /// Every gate. All of them must keep a way out.
+    let gates: [Cell]
     /// Evac helipad, what you're defending.
     let exit: Cell
     /// Boulders and water: always blocked, never buildable.
@@ -26,10 +28,11 @@ final class Grid {
     /// The same distance map, but with the river open.
     private var swimField: [Int] = []
 
-    init(cols: Int, rows: Int, spawn: Cell, exit: Cell, terrain: Set<Cell> = [], water: Set<Cell> = []) {
+    init(cols: Int, rows: Int, spawn: Cell, exit: Cell, terrain: Set<Cell> = [], water: Set<Cell> = [], gates: [Cell]? = nil) {
         self.cols = cols
         self.rows = rows
         self.spawn = spawn
+        self.gates = gates ?? [spawn]
         self.exit = exit
         self.terrain = terrain
         self.water = water
@@ -41,7 +44,7 @@ final class Grid {
     convenience init(level: Level) {
         self.init(
             cols: Level.cols, rows: Level.rows, spawn: level.spawn, exit: level.exit,
-            terrain: level.terrain, water: Set(level.water)
+            terrain: level.terrain, water: Set(level.water), gates: level.gates
         )
     }
 
@@ -66,7 +69,7 @@ final class Grid {
     /// in `mustStayOpen` (where dinos are standing or heading). Returns false and
     /// changes nothing if the build isn't allowed.
     func block(_ cell: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
-        guard contains(cell), cell != spawn, cell != exit, !blocked.contains(cell) else { return false }
+        guard contains(cell), !gates.contains(cell), cell != exit, !blocked.contains(cell) else { return false }
         var trial = blocked
         trial.insert(cell)
         return apply(trial, keeping: mustStayOpen, swimmers: swimmers)
@@ -74,7 +77,7 @@ final class Grid {
 
     /// Whether building on a cell would leave every dino a way out, without building.
     func canBlock(_ cell: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
-        guard contains(cell), cell != spawn, cell != exit, !blocked.contains(cell) else { return false }
+        guard contains(cell), !gates.contains(cell), cell != exit, !blocked.contains(cell) else { return false }
         var trial = blocked
         trial.insert(cell)
         return fields(for: trial, keeping: mustStayOpen, swimmers: swimmers) != nil
@@ -84,7 +87,7 @@ final class Grid {
     /// have a way out. Returns false and changes nothing if the move isn't allowed.
     func move(from old: Cell, to new: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
         guard blocked.contains(old), !terrain.contains(old),
-              contains(new), new != spawn, new != exit, !blocked.contains(new) else { return false }
+              contains(new), !gates.contains(new), new != exit, !blocked.contains(new) else { return false }
         var trial = blocked
         trial.remove(old)
         trial.insert(new)
@@ -115,7 +118,7 @@ final class Grid {
     /// Whether a move would leave every dino a way out, without moving anything.
     func canMove(from old: Cell, to new: Cell, keeping mustStayOpen: [Cell], keepingSwimmers swimmers: [Cell] = []) -> Bool {
         guard blocked.contains(old), !terrain.contains(old),
-              contains(new), new != spawn, new != exit, !blocked.contains(new) else { return false }
+              contains(new), !gates.contains(new), new != exit, !blocked.contains(new) else { return false }
         var trial = blocked
         trial.remove(old)
         trial.insert(new)
@@ -133,7 +136,7 @@ final class Grid {
     /// Distance maps for a trial layout, or nil if it seals anyone in.
     private func fields(for trial: Set<Cell>, keeping mustStayOpen: [Cell], swimmers: [Cell]) -> ([Int], [Int])? {
         let trialField = buildField(blocked: trial)
-        for open in [spawn] + mustStayOpen where trialField[index(open)] == Grid.unreachable {
+        for open in gates + mustStayOpen where trialField[index(open)] == Grid.unreachable {
             return nil
         }
         let trialSwim = buildField(blocked: trial.subtracting(water))

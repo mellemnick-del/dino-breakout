@@ -426,7 +426,15 @@ private struct ParkMap: View {
             for cell in level.rocks {
                 context.fill(Path(ellipseIn: rect(cell).insetBy(dx: c * 0.1, dy: c * 0.1)), with: .color(MenuColor.rock))
             }
-            context.fill(Path(rect(level.spawn)), with: .color(MenuColor.gate))
+            for cell in level.tar {
+                context.fill(Path(ellipseIn: rect(cell).insetBy(dx: c * 0.05, dy: c * 0.05)), with: .color(Color(red: 0.09, green: 0.07, blue: 0.06)))
+            }
+            for cell in level.nests {
+                context.fill(Path(ellipseIn: rect(cell).insetBy(dx: c * 0.15, dy: c * 0.15)), with: .color(Color(red: 0.93, green: 0.89, blue: 0.78)))
+            }
+            for gate in level.gates {
+                context.fill(Path(rect(gate)), with: .color(MenuColor.gate))
+            }
             context.fill(Path(rect(level.exit)), with: .color(MenuColor.pad))
             context.stroke(Path(ellipseIn: rect(level.exit).insetBy(dx: c * 0.2, dy: c * 0.2)), with: .color(MenuColor.hazard), lineWidth: 1)
             if level.night {
