@@ -5,6 +5,10 @@ name: App Store screenshots
 # the `screenshots` branch. Run it from the Actions tab.
 on:
   workflow_dispatch:
+    inputs:
+      scenes:
+        description: "Scenes to shoot, as scene:seconds pairs"
+        default: "1:18 2:30 3:18 4:6 5:8"
 
 permissions:
   contents: write
@@ -35,6 +39,7 @@ jobs:
           set -e
           APP="build/Debug-iphonesimulator/DinoBreakout.app"
           BUNDLE="com.nickmellem.dinobreakout"
+          SCENES="${{ inputs.scenes || '1:18 2:30 3:18 4:6 5:8' }}"
           SDK=$(xcrun --sdk iphonesimulator --show-sdk-version)
           echo "Simulator SDK $SDK"
           mkdir -p shots
@@ -75,14 +80,15 @@ jobs:
             xcrun simctl install "$udid" "$APP"
             mkdir -p "shots/$folder"
             # scene, seconds to let it play out
-            for spec in "1 18" "2 30" "3 18" "4 6" "5 8"; do
-              set -- $spec
-              local args=(-shot "$1" -tutorialDone YES)
-              if [ "$1" != "5" ]; then args+=(-testMode YES); fi
-              echo "$(date +%T) scene $1"
+            for spec in $SCENES; do
+              local scene="${spec%%:*}"
+              local wait="${spec##*:}"
+              local args=(-shot "$scene" -tutorialDone YES)
+              if [ "$scene" != "5" ]; then args+=(-testMode YES); fi
+              echo "$(date +%T) scene $scene"
               xcrun simctl launch --terminate-running-process "$udid" "$BUNDLE" "${args[@]}"
-              sleep "$2"
-              xcrun simctl io "$udid" screenshot "shots/$folder/$1.png"
+              sleep "$wait"
+              xcrun simctl io "$udid" screenshot "shots/$folder/$scene.png"
             done
             xcrun simctl shutdown "$udid" || true
           }

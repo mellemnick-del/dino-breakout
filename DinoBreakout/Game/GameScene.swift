@@ -2491,7 +2491,8 @@ final class GameScene: SKScene {
         refreshPath()
 
         let setups: [Int: (wave: Int, cash: Int, lives: Int)] = [
-            1: (9, 1385, 20), 2: (20, 2210, 17), 3: (22, 1890, 18), 4: (12, 640, 20)
+            1: (9, 1385, 20), 2: (20, 2210, 17), 3: (22, 1890, 18), 4: (12, 640, 20),
+            6: (9, 1120, 20), 7: (12, 980, 19), 8: (11, 1340, 18)
         ]
         guard let setup = setups[screenshot] else { return }
         wavesStarted = setup.wave - 1

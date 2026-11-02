@@ -76,8 +76,8 @@ struct RootView: View {
         guard shot > 0 else { return false }
         UserDefaults.standard.set(true, forKey: Tutorial.doneKey)
         SavedGame.clear()
-        let parks = ["paddock-b", "mount-ember", "aviary", "paddock-b"]
-        if shot <= parks.count, let level = Level.all.first(where: { $0.id == parks[shot - 1] }) {
+        let parks = ["paddock-b", "mount-ember", "aviary", "paddock-b", "", "tar-pits", "hatchery", "twin-gates"]
+        if shot != 5, shot <= parks.count, let level = Level.all.first(where: { $0.id == parks[shot - 1] }) {
             session = GameSession(level: level, difficulty: .medium, screenshot: shot)
         } else {
             // The menu, with a few parks beaten so the stars and unlocks show
