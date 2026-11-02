@@ -94,6 +94,9 @@ final class GameScene: SKScene {
 
     /// Board, towers, and dinos live here so the T-Rex can shake it all.
     private let world = SKNode()
+    /// Where the world rests. After an iPad rotates mid-game, the world is scaled
+    /// and moved to fit the new shape instead of being rebuilt.
+    private var worldBase: CGPoint = .zero
     private var hud: HUD!
 
     private var towers: [Cell: Tower] = [:]
@@ -255,6 +258,62 @@ final class GameScene: SKScene {
         startNewGame()
     }
 
+    // MARK: - Rotation
+
+    override func didChangeSize(_ oldSize: CGSize) {
+        super.didChangeSize(oldSize)
+        guard hud != nil, size.width > 0, size.height > 0, oldSize != size else { return }
+        relayout(from: oldSize)
+    }
+
+    /// An iPad rotated: fit the board to the new shape and rebuild the bars,
+    /// keeping the game (towers, dinos, shots) exactly as it is.
+    private func relayout(from oldSize: CGSize) {
+        world.removeAction(forKey: "shake")
+        let available = size.height - topHeight - bottomHeight
+        let fit = floor(min(size.width / CGFloat(cols), available / CGFloat(rows)))
+        let scale = fit / cellSize
+        let newOrigin = CGPoint(
+            x: (size.width - fit * CGFloat(cols)) / 2,
+            y: bottomHeight + (available - fit * CGFloat(rows)) / 2
+        )
+        world.setScale(scale)
+        worldBase = CGPoint(x: newOrigin.x - origin.x * scale, y: newOrigin.y - origin.y * scale)
+        world.position = worldBase
+
+        // Fresh bars for the new width, showing the current game
+        hud.removeFromParent()
+        hud = HUD(size: size, topHeight: topHeight, bottomHeight: bottomHeight, topInset: topInset, bottomInset: bottomInset)
+        addChild(hud)
+        hud.setPrice(.fence, to: price(of: .fence))
+        hud.setCash(cash)
+        hud.setLives(lives)
+        hud.setWave(wavesStarted, of: endless ? nil : waveGoal)
+        hud.select(tool)
+        updateAirstrikeButton()
+        updatePreview()
+        if waveActive {
+            hud.setSpeed(gameSpeed)
+        } else {
+            hud.setSendEnabled(!isOver)
+        }
+
+        closePanel()
+        childNode(withName: "banner")?.removeFromParent()
+        if pauseMenu != nil {
+            closePauseMenu()
+            openPauseMenu()
+        }
+        if let overlay = gameOverOverlay as? SKSpriteNode {
+            overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
+            overlay.size = size
+        }
+        if let tutorial {
+            tutorial.node.position.x += (size.width - oldSize.width) / 2
+            tutorial.node.position.y += size.height - oldSize.height
+        }
+    }
+
     // MARK: - Setup
 
     private func startNewGame() {
@@ -270,6 +329,8 @@ final class GameScene: SKScene {
         world.removeAllChildren()
         world.removeAllActions()
         world.position = .zero
+        world.setScale(1)
+        worldBase = .zero
         addChild(world)
 
         grid = Grid(level: level)
@@ -2782,7 +2843,8 @@ final class GameScene: SKScene {
         let node = SKNode()
         node.name = "banner"
         node.zPosition = 60
-        node.position = CGPoint(x: size.width / 2, y: origin.y + cellSize * CGFloat(rows) * 0.6)
+        let boardPoint = convert(CGPoint(x: origin.x, y: origin.y + cellSize * CGFloat(rows) * 0.6), from: world)
+        node.position = CGPoint(x: size.width / 2, y: boardPoint.y)
         for (offset, tint) in [(CGPoint(x: 2, y: -2), SKColor.black.withAlphaComponent(0.6)), (CGPoint.zero, color)] {
             let label = makeLabel(title, size: 32, font: Fonts.heavy, color: tint)
             label.position = offset
@@ -2825,9 +2887,9 @@ final class GameScene: SKScene {
         for _ in 0..<14 {
             let dx = CGFloat.random(in: -6...6)
             let dy = CGFloat.random(in: -6...6)
-            steps.append(.move(to: CGPoint(x: dx, y: dy), duration: 0.05))
+            steps.append(.move(to: CGPoint(x: worldBase.x + dx, y: worldBase.y + dy), duration: 0.05))
         }
-        steps.append(.move(to: .zero, duration: 0.05))
+        steps.append(.move(to: worldBase, duration: 0.05))
         world.run(.sequence(steps), withKey: "shake")
     }
 }

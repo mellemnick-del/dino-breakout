@@ -98,7 +98,7 @@ To get new changes later: **Integrate > Pull**.
 
 ## Tech
 
-- Swift, SpriteKit, and a thin SwiftUI wrapper. iOS 17 and up, iPhone and iPad, portrait.
+- Swift, SpriteKit, and a thin SwiftUI wrapper. iOS 17 and up. iPhone in portrait; iPad in any orientation (the board rescales when it rotates, even mid-wave).
 - Zero third party dependencies.
 - The `DinoBreakout` folder is a synced folder in Xcode, so any new Swift file dropped in it is part of the build automatically.
 

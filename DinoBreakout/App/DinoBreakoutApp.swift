@@ -126,7 +126,8 @@ struct GameView: View {
                     endless: session.endless, challenge: session.challenge, safeInsets: insets,
                     resume: session.resume
                 )
-                newScene.scaleMode = .aspectFit
+                // The scene takes the view's size, and relays itself out when an iPad rotates
+                newScene.scaleMode = .resizeFill
                 newScene.screenshot = session.screenshot
                 newScene.onExit = onExit
                 scene = newScene
