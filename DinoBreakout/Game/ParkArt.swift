@@ -391,7 +391,7 @@ enum ParkArt {
 
     /// A speckled dino egg.
     static func egg(cell c: CGFloat) -> SKTexture {
-        let side = c * 0.5
+        let side = c * 0.65
         return texture("egg-\(Int(c))", size: CGSize(width: side, height: side)) { ctx in
             let w = side * 0.62
             let h = side * 0.82

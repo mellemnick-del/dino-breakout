@@ -241,7 +241,7 @@ final class Dino: SKNode {
         if kind == .egg {
             // A speckled egg instead of a walking dino
             art.texture = ParkArt.egg(cell: cellSize)
-            art.size = CGSize(width: cellSize * 0.5, height: cellSize * 0.5)
+            art.size = CGSize(width: cellSize * 0.65, height: cellSize * 0.65)
             art.anchorPoint = CGPoint(x: 0.5, y: 0.5)
             art.zRotation = 0
             art.run(.repeatForever(.sequence([
